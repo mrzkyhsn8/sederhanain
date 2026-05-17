@@ -40,6 +40,12 @@ interface SederhanainData {
   simulationSteps: SimulationStep[];
 }
 
+interface HistoryItem {
+  concept: string;
+  data: SederhanainData;
+  timestamp: number;
+}
+
 function sanitizeTitle(title: string) {
   return title.replace(/^(SETUP|PROCESSING|ACTIVE|BROKEN):\s*/i, "").trim();
 }
@@ -50,6 +56,14 @@ export default function App() {
   const [data, setData] = useState<SederhanainData | null>(null);
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
   const [token, setToken] = useState<string | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>(() => {
+    try {
+      const saved = localStorage.getItem("sederhanain_history");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const login = useGoogleLogin({
     onSuccess: (tokenResponse) => {
@@ -75,7 +89,7 @@ export default function App() {
     try {
       const res = await fetch("/api/analogize", {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${activeToken}`
         },
@@ -84,6 +98,18 @@ export default function App() {
       const json = await res.json();
       if (json.error) throw new Error(json.error);
       setData(json);
+
+      // Save successful result to local storage history
+      setHistory(prev => {
+        const filtered = prev.filter(item => item.concept.toLowerCase() !== concept.toLowerCase());
+        const updated = [{ concept, data: json, timestamp: Date.now() }, ...filtered].slice(0, 5);
+        try {
+          localStorage.setItem("sederhanain_history", JSON.stringify(updated));
+        } catch (e) {
+          console.error(e);
+        }
+        return updated;
+      });
     } catch (err: any) {
       alert("Error: " + err.message);
     } finally {
@@ -115,7 +141,7 @@ export default function App() {
             className="h-20 px-8 flex items-center justify-between border-b border-white/10 shrink-0"
           >
             <div className="flex items-baseline gap-3">
-              <button 
+              <button
                 onClick={() => { setData(null); setIsLoading(false); setConceptInput(''); }}
                 className="text-2xl font-black tracking-tighter uppercase text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
               >
@@ -123,7 +149,7 @@ export default function App() {
               </button>
               <span className="hidden md:inline text-[10px] uppercase tracking-[0.3em] font-medium text-white/40">AI Concept Visualizer v2.0</span>
             </div>
-            
+
             <div className="flex items-center gap-4">
               <motion.form layoutId="search-form" onSubmit={handleSubmit} className="flex gap-2 w-full max-w-[300px] md:max-w-md hidden md:flex">
                 <motion.input
@@ -143,9 +169,9 @@ export default function App() {
                   {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Analisis"}
                 </motion.button>
               </motion.form>
-              
+
               {!token ? null : (
-                <button 
+                <button
                   onClick={() => {
                     googleLogout();
                     setToken(null);
@@ -166,7 +192,7 @@ export default function App() {
             {/* LOGOUT BUTTON FOR LOGGED IN USERS ON LANDING PAGE */}
             {token && (
               <div className="absolute top-6 right-8 z-50">
-                <button 
+                <button
                   onClick={() => {
                     googleLogout();
                     setToken(null);
@@ -222,6 +248,24 @@ export default function App() {
                     <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
                   </motion.button>
                 </motion.form>
+
+                {history.length > 0 && (
+                  <div className="mt-8 flex flex-wrap justify-center gap-2 max-w-2xl relative z-20">
+                    <span className="text-[10px] w-full text-center uppercase tracking-[0.3em] font-bold text-white/40 mb-1">Riwayat Analisis Anda:</span>
+                    {history.map((item, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          setConceptInput(item.concept);
+                          setData(item.data);
+                        }}
+                        className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-500/60 px-4 py-2 rounded-full text-xs font-semibold text-emerald-400 transition-all shadow-md shadow-emerald-500/5 hover:-translate-y-0.5 cursor-pointer"
+                      >
+                        {item.concept}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {/* TOPIK POPULER SECTION */}
                 <div className="mt-14 flex flex-col items-center relative z-10 w-full overflow-hidden">
