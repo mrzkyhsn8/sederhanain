@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Loader2, ChevronRight, ChevronLeft, LogOut } from "lucide-react";
 import { useGoogleLogin, googleLogout } from '@react-oauth/google';
@@ -64,6 +64,19 @@ export default function App() {
       return [];
     }
   });
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!data) return;
+      if (e.key === "ArrowLeft") {
+        setCurrentStepIdx((prev) => Math.max(0, prev - 1));
+      } else if (e.key === "ArrowRight") {
+        setCurrentStepIdx((prev) => Math.min(data.simulationSteps.length - 1, prev + 1));
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [data]);
 
   const login = useGoogleLogin({
     onSuccess: (tokenResponse) => {
@@ -186,7 +199,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <main className="flex-1 flex flex-col md:flex-row relative">
+      <main className="flex-1 flex flex-col-reverse md:flex-row relative">
         {!data && !isLoading && (
           <div className="w-full flex flex-col items-center relative z-10">
             {/* LOGOUT BUTTON FOR LOGGED IN USERS ON LANDING PAGE */}
@@ -527,25 +540,37 @@ export default function App() {
 
         {data && (
           <>
-            <aside className="w-full md:w-[340px] border-r border-white/10 bg-[#0a0a0a] p-8 flex flex-col shrink-0 relative z-10">
-              <div className="mb-10">
+            <aside className="w-full md:w-[340px] border-r border-white/10 bg-[#0a0a0a]/90 backdrop-blur-md p-6 md:p-8 flex flex-col shrink-0 relative z-20 shadow-2xl">
+              <div className="mb-8">
                 <h2 className="text-[11px] uppercase tracking-[0.2em] text-emerald-400 font-bold mb-2">Tema Analogi</h2>
-                <h3 className="text-3xl font-light leading-tight mb-4">{data.analogyTheme}</h3>
+                <h3 className="text-2xl md:text-3xl font-light leading-tight mb-3">{data.analogyTheme}</h3>
                 <p className="text-sm text-white/50 leading-relaxed font-light">
                   {data.overview}
                 </p>
               </div>
 
-              <div className="space-y-6 mb-10 flex-1">
+              <div className="space-y-6 mb-8 flex-1 overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
                 {data.simulationSteps.map((step, idx) => (
-                  <div key={idx} className={`relative pl-8 border-l ${idx === currentStepIdx ? 'border-l-2 border-emerald-500' : 'border-white/10'}`}>
+                  <div 
+                    key={idx} 
+                    onClick={() => setCurrentStepIdx(idx)}
+                    className={`relative pl-8 border-l py-1 cursor-pointer transition-all duration-300 group
+                      ${idx <= currentStepIdx ? 'border-emerald-500' : 'border-white/10'}
+                    `}
+                  >
                     {idx === currentStepIdx ? (
-                      <div className="absolute -left-[7px] top-0 w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)]"></div>
+                      <div className="absolute -left-[7px] top-1.5 w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
                     ) : (
-                      <div className="absolute -left-[5px] top-0 w-2 h-2 rounded-full bg-white/20"></div>
+                      <div className={`absolute -left-[5px] top-2 w-2 h-2 rounded-full transition-colors duration-300 
+                        ${idx < currentStepIdx ? 'bg-emerald-500/50' : 'bg-white/20 group-hover:bg-white/40'}
+                      `}></div>
                     )}
-                    <h4 className={`text-[10px] uppercase tracking-widest mb-1 ${idx === currentStepIdx ? 'text-emerald-400' : 'text-white/40'}`}>Langkah 0{idx + 1}</h4>
-                    <p className={`text-sm ${idx === currentStepIdx ? 'font-bold text-white' : idx < currentStepIdx ? 'font-medium opacity-60' : 'font-medium opacity-40'}`}>
+                    <h4 className={`text-[10px] uppercase tracking-widest mb-1 transition-colors duration-300 
+                      ${idx === currentStepIdx ? 'text-emerald-400' : 'text-white/40 group-hover:text-white/60'}
+                    `}>Langkah 0{idx + 1}</h4>
+                    <p className={`text-sm transition-all duration-300 
+                      ${idx === currentStepIdx ? 'font-bold text-white' : idx < currentStepIdx ? 'font-medium text-white/70' : 'font-medium text-white/40 group-hover:text-white/60'}
+                    `}>
                       {step.visualState}: {sanitizeTitle(step.title)}
                     </p>
                   </div>
@@ -553,35 +578,38 @@ export default function App() {
               </div>
 
               <div className="mt-auto flex flex-col gap-4 border-t border-white/10 pt-6">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={currentStepIdx}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="flex flex-col gap-2"
-                  >
-                    <p className="text-sm text-white/80 leading-relaxed italic border-l block border-emerald-500/50 pl-3 py-1 font-serif">
-                      "{data.simulationSteps[currentStepIdx].analogyAction}"
-                    </p>
-                    <p className="text-[10px] tracking-wider uppercase text-emerald-400/60 font-mono">
-                      <span className="opacity-50">TECH:</span> {data.simulationSteps[currentStepIdx].techAction}
-                    </p>
-                  </motion.div>
-                </AnimatePresence>
+                <div className="min-h-[96px] flex flex-col justify-center">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={currentStepIdx}
+                      initial={{ opacity: 0, y: 15 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -15 }}
+                      transition={{ duration: 0.3, ease: "easeOut" }}
+                      className="flex flex-col gap-2"
+                    >
+                      <p className="text-sm text-white/80 leading-relaxed italic border-l block border-emerald-500/50 pl-3 py-1 font-serif line-clamp-2">
+                        "{data.simulationSteps[currentStepIdx].analogyAction}"
+                      </p>
+                      <p className="text-[10px] tracking-wider uppercase text-emerald-400/60 font-mono truncate">
+                        <span className="opacity-50">TECH:</span> {data.simulationSteps[currentStepIdx].techAction}
+                      </p>
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
 
-                <div className="flex gap-2">
+                <div className="flex gap-2 mt-2">
                   <button
                     onClick={() => setCurrentStepIdx(Math.max(0, currentStepIdx - 1))}
                     disabled={currentStepIdx === 0}
-                    className="w-10 h-10 rounded border border-white/10 flex items-center justify-center hover:bg-white/5 disabled:opacity-20 transition-all text-white/70"
+                    className="w-10 h-10 rounded-lg border border-white/10 flex items-center justify-center hover:bg-white/5 disabled:opacity-20 transition-all text-white/70"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setCurrentStepIdx(Math.min(data.simulationSteps.length - 1, currentStepIdx + 1))}
                     disabled={currentStepIdx === data.simulationSteps.length - 1}
-                    className="flex-1 rounded border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 flex items-center justify-center gap-2 font-bold uppercase text-[10px] tracking-widest hover:bg-emerald-500/20 disabled:opacity-20 transition-all disabled:hover:bg-emerald-500/10"
+                    className="flex-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 flex items-center justify-center gap-2 font-bold uppercase text-[10px] tracking-widest hover:bg-emerald-500/20 disabled:opacity-20 transition-all disabled:hover:bg-emerald-500/10 hover:shadow-[0_0_15px_rgba(16,185,129,0.3)]"
                   >
                     <span>Next Step</span>
                     <ChevronRight className="w-4 h-4" />
@@ -590,13 +618,24 @@ export default function App() {
               </div>
             </aside>
 
-            <section className="flex-1 relative bg-[radial-gradient(#1a1a1a_1px,transparent_1px)] [background-size:32px_32px] overflow-hidden flex items-center justify-center min-h-[400px]">
-              <VisualStage
-                entities={data.entities}
-                visualState={data.simulationSteps[currentStepIdx].visualState}
-                layoutType={data.layoutType}
-                animationConfig={data.simulationSteps[currentStepIdx].animationConfig}
-              />
+            <section className="flex-1 relative bg-[radial-gradient(#1a1a1a_1px,transparent_1px)] [background-size:32px_32px] overflow-hidden flex items-center justify-center min-h-[50vh] md:min-h-[400px]">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentStepIdx}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 1.05 }}
+                  transition={{ duration: 0.4 }}
+                  className="w-full h-full flex justify-center items-center absolute inset-0"
+                >
+                  <VisualStage
+                    entities={data.entities}
+                    visualState={data.simulationSteps[currentStepIdx].visualState}
+                    layoutType={data.layoutType}
+                    animationConfig={data.simulationSteps[currentStepIdx].animationConfig}
+                  />
+                </motion.div>
+              </AnimatePresence>
             </section>
           </>
         )}
