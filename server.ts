@@ -3,6 +3,8 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import "dotenv/config";
+import rateLimit from "express-rate-limit";
+import { OAuth2Client } from "google-auth-library";
 
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
@@ -17,9 +19,60 @@ async function startServer() {
   const app = express();
   const PORT = process.env.PORT || 3000;
 
+  app.set('trust proxy', 1);
+
   app.use(express.json());
 
-  app.post("/api/analogize", async (req, res) => {
+  const googleClient = new OAuth2Client(process.env.VITE_GOOGLE_CLIENT_ID);
+
+  const authMiddleware = async (req: any, res: any, next: any) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "Silakan login dengan Google terlebih dahulu." });
+    }
+
+    const token = authHeader.split(" ")[1];
+    try {
+      const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (!response.ok) {
+        throw new Error("Invalid token response from Google");
+      }
+      
+      const payload = await response.json();
+      if (payload && payload.email) {
+        req.userEmail = payload.email;
+        next();
+      } else {
+        res.status(401).json({ error: "Token tidak valid atau tidak memiliki email." });
+      }
+    } catch (error) {
+      console.error("Token verification error:", error);
+      res.status(401).json({ error: "Gagal memverifikasi login Google. Silakan login kembali." });
+    }
+  };
+
+  const apiLimiter = rateLimit({
+    windowMs: 24 * 60 * 60 * 1000, // 24 jam
+    max: 5, // Batas 5 request per user
+    message: { error: "Limit tercapai. Anda hanya bisa melakukan 5 pencarian dalam 24 jam. Silakan coba lagi besok." },
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req: any) => {
+      return req.userEmail || "anonymous";
+    },
+    skip: (req: any) => {
+      if (!req.userEmail) return false;
+      const whitelist = process.env.WHITELIST_EMAILS 
+        ? process.env.WHITELIST_EMAILS.split(",").map(e => e.trim().toLowerCase()) 
+        : [];
+      return whitelist.includes(req.userEmail.toLowerCase());
+    }
+  });
+
+  app.post("/api/analogize", authMiddleware, apiLimiter, async (req, res) => {
     try {
       const { concept } = req.body;
       if (!concept) {

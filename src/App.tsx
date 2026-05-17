@@ -5,7 +5,8 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Loader2, ChevronRight, ChevronLeft } from "lucide-react";
+import { Loader2, ChevronRight, ChevronLeft, LogOut } from "lucide-react";
+import { useGoogleLogin, googleLogout } from '@react-oauth/google';
 
 interface Entity {
   id: string;
@@ -48,9 +49,24 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState<SederhanainData | null>(null);
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
+  const [token, setToken] = useState<string | null>(null);
 
-  const executeAnalysis = async (concept: string) => {
+  const login = useGoogleLogin({
+    onSuccess: (tokenResponse) => {
+      setToken(tokenResponse.access_token);
+      executeAnalysis(conceptInput, tokenResponse.access_token);
+    },
+    onError: () => alert('Google Login Failed'),
+  });
+
+  const executeAnalysis = async (concept: string, currentToken?: string) => {
     if (!concept.trim()) return;
+
+    const activeToken = currentToken || token;
+    if (!activeToken) {
+      login();
+      return;
+    }
 
     setIsLoading(true);
     setData(null);
@@ -59,7 +75,10 @@ export default function App() {
     try {
       const res = await fetch("/api/analogize", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${activeToken}`
+        },
         body: JSON.stringify({ concept }),
       });
       const json = await res.json();
@@ -74,6 +93,10 @@ export default function App() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!token) {
+      login();
+      return;
+    }
     executeAnalysis(conceptInput);
   };
 
@@ -92,27 +115,47 @@ export default function App() {
             className="h-20 px-8 flex items-center justify-between border-b border-white/10 shrink-0"
           >
             <div className="flex items-baseline gap-3">
-              <span className="text-2xl font-black tracking-tighter uppercase text-emerald-400">Sederhanain.</span>
+              <button 
+                onClick={() => { setData(null); setIsLoading(false); setConceptInput(''); }}
+                className="text-2xl font-black tracking-tighter uppercase text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+              >
+                Sederhanain.
+              </button>
               <span className="hidden md:inline text-[10px] uppercase tracking-[0.3em] font-medium text-white/40">AI Concept Visualizer v2.0</span>
             </div>
-            <motion.form layoutId="search-form" onSubmit={handleSubmit} className="flex gap-2 w-full max-w-[300px] md:max-w-md">
-              <motion.input
-                layoutId="search-input"
-                type="text"
-                className="flex-1 bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-emerald-400 transition-colors placeholder:text-white/40 font-mono"
-                placeholder="Ketik konsep..."
-                value={conceptInput}
-                onChange={(e) => setConceptInput(e.target.value)}
-              />
-              <motion.button
-                layoutId="search-button"
-                type="submit"
-                disabled={isLoading}
-                className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-4 py-2 rounded-full font-bold uppercase tracking-wider text-[10px] hover:bg-emerald-500/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 min-w-[100px]"
-              >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Analisis"}
-              </motion.button>
-            </motion.form>
+            
+            <div className="flex items-center gap-4">
+              <motion.form layoutId="search-form" onSubmit={handleSubmit} className="flex gap-2 w-full max-w-[300px] md:max-w-md hidden md:flex">
+                <motion.input
+                  layoutId="search-input"
+                  type="text"
+                  className="flex-1 bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-emerald-400 transition-colors placeholder:text-white/40 font-mono"
+                  placeholder="Ketik konsep..."
+                  value={conceptInput}
+                  onChange={(e) => setConceptInput(e.target.value)}
+                />
+                <motion.button
+                  layoutId="search-button"
+                  type="submit"
+                  disabled={isLoading}
+                  className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-4 py-2 rounded-full font-bold uppercase tracking-wider text-[10px] hover:bg-emerald-500/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 min-w-[100px]"
+                >
+                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Analisis"}
+                </motion.button>
+              </motion.form>
+              
+              {!token ? null : (
+                <button 
+                  onClick={() => {
+                    googleLogout();
+                    setToken(null);
+                  }}
+                  className="text-white/50 hover:text-white text-xs flex items-center gap-1 border border-white/10 px-3 py-1.5 rounded-full"
+                >
+                  <LogOut className="w-3 h-3" /> Logout
+                </button>
+              )}
+            </div>
           </motion.header>
         )}
       </AnimatePresence>
@@ -120,6 +163,21 @@ export default function App() {
       <main className="flex-1 flex flex-col md:flex-row relative">
         {!data && !isLoading && (
           <div className="w-full flex flex-col items-center relative z-10">
+            {/* LOGOUT BUTTON FOR LOGGED IN USERS ON LANDING PAGE */}
+            {token && (
+              <div className="absolute top-6 right-8 z-50">
+                <button 
+                  onClick={() => {
+                    googleLogout();
+                    setToken(null);
+                  }}
+                  className="text-white/50 hover:text-white text-xs flex items-center gap-1 border border-white/10 px-3 py-1.5 rounded-full bg-[#050505]/50 backdrop-blur-sm hover:border-white/20 transition-all"
+                >
+                  <LogOut className="w-3 h-3" /> Logout
+                </button>
+              </div>
+            )}
+
             {/* BACKGROUND GRID */}
             <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:24px_24px]"></div>
@@ -177,8 +235,8 @@ export default function App() {
                       {[...Array(2)].map((_, i) => (
                         <div key={i} className="flex gap-2 px-1">
                           {[
-                            "🌐 WebSockets", "🪐 Black Hole", "💸 Inflasi Ekonomi", "🍃 Fotosintesis", "🤖 Machine Learning",
-                            "🌠 Supernova", "📈 Supply & Demand", "🧬 Replikasi DNA", "⚖️ Load Balancer", "🐈 Kucing Schrödinger"
+                            "🌐 WebSockets", "🪐 Black Hole", "💸 Inflasi Ekonomi", "🍃 Fotosintesis", "🪐 Entanglement Kuantum",
+                            "🌠 Supernova", "📈 Supply & Demand", "🛑 Deadlock Mutual", "⚖️ Load Balancer", "🐈 Kucing Schrödinger"
                           ].map((topic, j) => (
                             <button
                               key={`${i}-${j}`}
@@ -198,8 +256,8 @@ export default function App() {
                       {[...Array(2)].map((_, i) => (
                         <div key={i} className="flex gap-2 px-1">
                           {[
-                            "🔄 Async vs Sync", "⚛️ Quantum Computing", "🔄 Compound Interest", "🛡️ Sistem Imun", "🐳 Docker Container",
-                            "⏳ Teori Relativitas", "🏦 Deflasi", "🧠 Efek Placebo", "🔑 Kriptografi", "🔥 Burnout"
+                            "🔄 Asynchronous vs Synchronous", "⚛️ Quantum Computing", "🔄 Compound Interest", "🛡️ Sistem Imun", "🐳 Docker Container",
+                            "⏳ Teori Relativitas", "🔒 SSL/TLS Handshake", "🧠 Efek Placebo", "🏎️ Race Condition", "🔥 Burnout"
                           ].map((topic, j) => (
                             <button
                               key={`${i}-${j}`}
