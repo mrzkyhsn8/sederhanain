@@ -39,15 +39,18 @@ interface SederhanainData {
   simulationSteps: SimulationStep[];
 }
 
+function sanitizeTitle(title: string) {
+  return title.replace(/^(SETUP|PROCESSING|ACTIVE|BROKEN):\s*/i, "").trim();
+}
+
 export default function App() {
   const [conceptInput, setConceptInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState<SederhanainData | null>(null);
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!conceptInput.trim()) return;
+  const executeAnalysis = async (concept: string) => {
+    if (!concept.trim()) return;
 
     setIsLoading(true);
     setData(null);
@@ -57,7 +60,7 @@ export default function App() {
       const res = await fetch("/api/analogize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ concept: conceptInput }),
+        body: JSON.stringify({ concept }),
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -69,60 +72,289 @@ export default function App() {
     }
   };
 
-  return (
-    <div className="h-screen bg-[#050505] text-white flex flex-col font-sans overflow-hidden selection:bg-emerald-500 selection:text-white">
-      <header className="h-20 px-8 flex items-center justify-between border-b border-white/10 shrink-0">
-        <div className="flex items-baseline gap-3">
-          <span className="text-2xl font-black tracking-tighter uppercase text-emerald-400">Sederhanain.</span>
-          <span className="hidden md:inline text-[10px] uppercase tracking-[0.3em] font-medium text-white/40">AI Concept Visualizer v2.0</span>
-        </div>
-        {(data || isLoading) && (
-          <form onSubmit={handleSubmit} className="flex gap-2 w-full max-w-[300px] md:max-w-md">
-            <input
-              type="text"
-              className="flex-1 bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-emerald-400 transition-colors placeholder:text-white/40 font-mono"
-              placeholder="Ketik konsep..."
-              value={conceptInput}
-              onChange={(e) => setConceptInput(e.target.value)}
-            />
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-4 py-2 rounded-full font-bold uppercase tracking-wider text-[10px] hover:bg-emerald-500/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Analisis"}
-            </button>
-          </form>
-        )}
-      </header>
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    executeAnalysis(conceptInput);
+  };
 
-      <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-        {!data && !isLoading && (
-          <div className="flex-1 flex flex-col items-center justify-center text-center opacity-80 px-4">
-            <div className="w-24 h-24 border-4 border-dashed border-emerald-500/30 rounded-full flex items-center justify-center mb-6">
-              <span className="w-4 h-4 bg-emerald-500 rounded-full animate-pulse" />
+  const handleSuggest = (topic: string) => {
+    const cleanTopic = topic.split(" ").slice(1).join(" ");
+    setConceptInput(cleanTopic);
+  };
+
+  return (
+    <div className="min-h-screen bg-[#050505] text-white flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
+      <AnimatePresence>
+        {(data || isLoading) && (
+          <motion.header
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="h-20 px-8 flex items-center justify-between border-b border-white/10 shrink-0"
+          >
+            <div className="flex items-baseline gap-3">
+              <span className="text-2xl font-black tracking-tighter uppercase text-emerald-400">Sederhanain.</span>
+              <span className="hidden md:inline text-[10px] uppercase tracking-[0.3em] font-medium text-white/40">AI Concept Visualizer v2.0</span>
             </div>
-            <h2 className="text-2xl font-light mb-2">Tunggu apa lagi?</h2>
-            <p className="max-w-md text-sm text-white/50 mb-8">Ketik sebuah konsep asing di bawah, dan secara otomatis akan disederhanakan menjadi elemen geometri yang intuitif.</p>
-            
-            <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-3 w-full max-w-lg mt-4">
-              <input
+            <motion.form layoutId="search-form" onSubmit={handleSubmit} className="flex gap-2 w-full max-w-[300px] md:max-w-md">
+              <motion.input
+                layoutId="search-input"
                 type="text"
-                autoFocus
-                className="flex-1 bg-white/5 border border-white/10 rounded-full px-6 py-4 text-base focus:outline-none focus:border-emerald-400 transition-colors placeholder:text-white/40 font-mono text-center md:text-left"
-                placeholder="Misal: WebSockets, Black Hole..."
+                className="flex-1 bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-emerald-400 transition-colors placeholder:text-white/40 font-mono"
+                placeholder="Ketik konsep..."
                 value={conceptInput}
                 onChange={(e) => setConceptInput(e.target.value)}
               />
-              <button
+              <motion.button
+                layoutId="search-button"
                 type="submit"
-                disabled={isLoading || !conceptInput.trim()}
-                className="bg-emerald-500 text-black px-8 py-4 rounded-full font-bold uppercase tracking-wider text-xs hover:bg-emerald-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                disabled={isLoading}
+                className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-4 py-2 rounded-full font-bold uppercase tracking-wider text-[10px] hover:bg-emerald-500/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 min-w-[100px]"
               >
-                Analisis
-              </button>
-            </form>
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Analisis"}
+              </motion.button>
+            </motion.form>
+          </motion.header>
+        )}
+      </AnimatePresence>
+
+      <main className="flex-1 flex flex-col md:flex-row relative">
+        {!data && !isLoading && (
+          <div className="w-full flex flex-col items-center relative z-10">
+            {/* BACKGROUND GRID */}
+            <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+               {/* Fixed gradients so they don't block the grid below */}
+               <div className="absolute top-0 left-0 w-full h-[300px] bg-gradient-to-b from-[#050505] to-transparent"></div>
+               <div className="absolute bottom-0 left-0 w-full h-[300px] bg-gradient-to-t from-[#050505] to-transparent"></div>
+               
+               <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-emerald-500/10 rounded-[100%] blur-[120px]"></div>
+               <div className="absolute top-[60%] left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-emerald-500/5 rounded-[100%] blur-[150px]"></div>
+            </div>
+
+            {/* FOLD 1: HERO SECTION */}
+            <div className="min-h-screen flex flex-col items-center justify-center pt-12 pb-24 px-6 w-full relative z-10">
+              <div className="flex flex-col items-center text-center max-w-4xl w-full">
+                 <h1 className="text-5xl md:text-7xl font-black tracking-tighter uppercase text-emerald-400 mb-6 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                   SEDERHANAIN.
+                 </h1>
+                 <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-6">
+                   Bikin Konsep Rumit Jadi Sederhana.
+                 </h2>
+                 <p className="text-sm md:text-lg text-white/60 max-w-2xl mb-12 leading-relaxed font-medium">
+                   Platform interaktif berbasis Generative UI yang mengubah teori kaku, istilah IT, hingga fenomena sains menjadi simulasi analogi dunia nyata secara real-time.
+                 </p>
+                 
+                 <motion.form layoutId="search-form" onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-3 w-full max-w-3xl relative z-10">
+                   <motion.input
+                     layoutId="search-input"
+                     type="text"
+                     autoFocus
+                     className="flex-1 bg-white/[0.03] border border-white/10 rounded-full px-8 py-5 text-lg focus:outline-none focus:border-emerald-400 focus:bg-white/[0.05] focus:ring-4 focus:ring-emerald-500/10 transition-all placeholder:text-white/30 font-mono text-center md:text-left shadow-inner"
+                     placeholder="Ketik topik: Misal WebSockets..."
+                     value={conceptInput}
+                     onChange={(e) => setConceptInput(e.target.value)}
+                   />
+                   <motion.button
+                     layoutId="search-button"
+                     type="submit"
+                     disabled={isLoading || !conceptInput.trim()}
+                     className="bg-emerald-500 text-black px-10 py-5 rounded-full font-bold uppercase tracking-widest text-sm hover:bg-emerald-400 transition-all disabled:opacity-50 hover:shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center justify-center gap-2 shrink-0 border border-emerald-400 relative overflow-hidden group min-w-[160px]"
+                   >
+                     <span className="relative z-10">Analisis</span>
+                     <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+                   </motion.button>
+                 </motion.form>
+
+                 {/* TOPIK POPULER SECTION */}
+                 <div className="mt-14 flex flex-col items-center relative z-10 w-full overflow-hidden">
+                   <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-white/40 mb-4">Topik Populer:</span>
+                   
+                   {/* Marquee Container with Gradient Mask */}
+                   <div className="relative flex flex-col gap-3 w-full max-w-5xl overflow-hidden before:absolute before:left-0 before:top-0 before:bottom-0 before:w-16 before:bg-gradient-to-r before:from-[#050505] before:to-transparent before:z-10 after:absolute after:right-0 after:top-0 after:bottom-0 after:w-16 after:bg-gradient-to-l after:from-[#050505] after:to-transparent after:z-10">
+                     
+                     {/* Row 1: Left */}
+                     <div className="flex w-fit animate-marquee-left hover:[animation-play-state:paused]">
+                       {[...Array(2)].map((_, i) => (
+                         <div key={i} className="flex gap-2 px-1">
+                           {[
+                             "🌐 WebSockets", "🪐 Black Hole", "💸 Inflasi Ekonomi", "🍃 Fotosintesis", "🤖 Machine Learning",
+                             "🌠 Supernova", "📈 Supply & Demand", "🧬 Replikasi DNA", "⚖️ Load Balancer", "🐈 Kucing Schrödinger"
+                           ].map((topic, j) => (
+                             <button
+                               key={`${i}-${j}`}
+                               type="button"
+                               onClick={() => handleSuggest(topic)}
+                               className="bg-white/5 hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/50 px-4 py-2 rounded-full text-xs font-medium transition-all text-white/70 hover:text-emerald-400 whitespace-nowrap"
+                             >
+                               {topic}
+                             </button>
+                           ))}
+                         </div>
+                       ))}
+                     </div>
+
+                     {/* Row 2: Right */}
+                     <div className="flex w-fit animate-marquee-right hover:[animation-play-state:paused]">
+                       {[...Array(2)].map((_, i) => (
+                         <div key={i} className="flex gap-2 px-1">
+                           {[
+                             "🔄 Async vs Sync", "⚛️ Quantum Computing", "🔄 Compound Interest", "🛡️ Sistem Imun", "🐳 Docker Container",
+                             "⏳ Teori Relativitas", "🏦 Deflasi", "🧠 Efek Placebo", "🔑 Kriptografi", "🔥 Burnout"
+                           ].map((topic, j) => (
+                             <button
+                               key={`${i}-${j}`}
+                               type="button"
+                               onClick={() => handleSuggest(topic)}
+                               className="bg-white/5 hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/50 px-4 py-2 rounded-full text-xs font-medium transition-all text-white/70 hover:text-emerald-400 whitespace-nowrap"
+                             >
+                               {topic}
+                             </button>
+                           ))}
+                         </div>
+                       ))}
+                     </div>
+
+                   </div>
+                 </div>
+              </div>
+
+              {/* Scroll indicator down */}
+              <div className="absolute bottom-10 left-1/2 -translate-x-1/2 animate-bounce text-white/20 hidden md:block">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+              </div>
+            </div>
+
+            {/* FOLD 2+: CARA KERJA SECTION & OTHERS */}
+            <div className="w-full flex flex-col items-center px-6 pb-20 relative z-10">
+              <div className="w-full max-w-5xl pt-16 mt-16 mb-12 relative flex flex-col items-center">
+                <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-4 text-center">Bagaimana Sederhanain Bekerja? 🤔</h2>
+                <p className="text-white/50 text-center max-w-xl leading-relaxed">Hanya butuh tiga langkah simpel untuk mengubah teks buku yang membosankan menjadi cerita visual yang nempel di otak.</p>
+              </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl w-full pb-20 relative z-10">
+              <div className="group bg-gradient-to-b from-emerald-500/[0.02] hover:from-emerald-500/[0.08] to-transparent border border-emerald-500/10 hover:border-emerald-500/30 p-8 rounded-3xl flex flex-col items-center text-center relative overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_15px_40px_-15px_rgba(16,185,129,0.3)] md:pointer-events-auto cursor-default">
+                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent group-hover:w-2/3 transition-all duration-700 opacity-0 group-hover:opacity-100"></div>
+                 <div className="w-14 h-14 bg-white/5 group-hover:bg-emerald-500/10 group-hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] group-hover:ring-1 group-hover:ring-emerald-500/20 rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-inner transition-all duration-500 group-hover:scale-110 group-hover:-translate-y-1">⌨️</div>
+                 <h3 className="font-bold text-lg mb-3 tracking-tight group-hover:text-emerald-400 transition-colors duration-300">Ketik Topikmu</h3>
+                 <p className="text-sm text-white/50 leading-relaxed group-hover:text-white/70 transition-colors duration-300">Masukkan istilah abstrak apa saja, mulai dari WebSockets, Inflasi, hingga Black Hole.</p>
+              </div>
+              <div className="group bg-gradient-to-b from-emerald-500/[0.02] hover:from-emerald-500/[0.08] to-transparent border border-emerald-500/10 hover:border-emerald-500/30 p-8 rounded-3xl flex flex-col items-center text-center relative overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_15px_40px_-15px_rgba(16,185,129,0.3)] md:pointer-events-auto cursor-default">
+                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent group-hover:w-2/3 transition-all duration-700 opacity-0 group-hover:opacity-100"></div>
+                 <div className="w-14 h-14 bg-white/5 group-hover:bg-emerald-500/10 group-hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] group-hover:ring-1 group-hover:ring-emerald-500/20 rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-inner transition-all duration-500 group-hover:scale-110 group-hover:-translate-y-1">🧠</div>
+                 <h3 className="font-bold text-lg mb-3 tracking-tight group-hover:text-emerald-400 transition-colors duration-300">AI Meracik Analogi</h3>
+                 <p className="text-sm text-white/50 leading-relaxed group-hover:text-white/70 transition-colors duration-300">Mesin Sederhanain menerjemahkan teori kaku menjadi skenario cerita sehari-hari.</p>
+              </div>
+              <div className="group bg-gradient-to-b from-emerald-500/[0.02] hover:from-emerald-500/[0.08] to-transparent border border-emerald-500/10 hover:border-emerald-500/30 p-8 rounded-3xl flex flex-col items-center text-center relative overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_15px_40px_-15px_rgba(16,185,129,0.3)] md:pointer-events-auto cursor-default">
+                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent group-hover:w-2/3 transition-all duration-700 opacity-0 group-hover:opacity-100"></div>
+                 <div className="w-14 h-14 bg-white/5 group-hover:bg-emerald-500/10 group-hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] group-hover:ring-1 group-hover:ring-emerald-500/20 rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-inner transition-all duration-500 group-hover:scale-110 group-hover:-translate-y-1">🚀</div>
+                 <h3 className="font-bold text-lg mb-3 tracking-tight group-hover:text-emerald-400 transition-colors duration-300">Mainkan Simulasi</h3>
+                 <p className="text-sm text-white/50 leading-relaxed group-hover:text-white/70 transition-colors duration-300">Lihat visualisasi interaktif langkah-demi-langkah yang bergerak dinamis di layarmu.</p>
+              </div>
+            </div>
+
+            {/* SEKILAS SHOWCASE SECTION */}
+            <div className="w-full max-w-5xl mt-12 mb-32 relative z-10 flex flex-col items-center">
+              <h2 className="text-2xl md:text-4xl font-bold tracking-tight mb-4 text-center">Dari Teori Kaku Menjadi Cerita Seru</h2>
+              <p className="text-white/50 mb-12 text-center max-w-2xl leading-relaxed">Bandingkan sendiri bagaimana Sederhanain mengubah bahasa teknis yang membosankan menjadi analogi visual yang mudah dicerna otak.</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
+                {/* Sebelum */}
+                <div className="bg-[#0a0a0a] border border-white/5 p-8 rounded-3xl opacity-80 filter grayscale hover:grayscale-0 transition-all duration-500 group">
+                  <span className="inline-block bg-white/10 text-white/50 text-xs px-3 py-1 rounded-full mb-6 font-mono font-medium">Buku Teks / Wikipedia</span>
+                  <h3 className="text-xl font-bold mb-4 font-serif group-hover:text-white transition-colors">Definisi WebSockets</h3>
+                  <p className="text-sm text-white/40 leading-relaxed font-mono">
+                    "WebSocket adalah protokol komunikasi komputer, yang menyediakan full-duplex communication channels atas koneksi TCP tunggal. Protokol WebSocket distandarisasi oleh IETF sebagai RFC 6455..."
+                  </p>
+                  <div className="mt-8 flex items-center justify-center text-5xl py-8 opacity-20 group-hover:opacity-50 transition-opacity">😴</div>
+                </div>
+
+                {/* Sesudah */}
+                <div className="bg-gradient-to-b from-emerald-500/[0.08] to-transparent border border-emerald-500/30 p-8 rounded-3xl relative overflow-hidden hover:-translate-y-1 hover:shadow-[0_15px_40px_-20px_rgba(16,185,129,0.3)] transition-all duration-500">
+                  <div className="absolute top-0 right-0 p-6 opacity-10">
+                     <span className="text-7xl">🔥</span>
+                  </div>
+                  <span className="inline-block bg-emerald-500/20 text-emerald-400 text-xs px-3 py-1 rounded-full mb-6 font-mono font-medium border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]">Hasil Sederhanain</span>
+                  <h3 className="text-xl font-bold mb-4 text-white">Analogi: Pipa Air 2 Arah</h3>
+                  <p className="text-sm text-white/80 leading-relaxed bg-white/5 p-5 rounded-2xl border border-white/5">
+                    "Bayangkan sebuah <b className="text-emerald-400 font-bold">pipa air ajaib</b> di mana air bisa mengalir dari dua arah sekaligus tanpa harus menunggu giliran. Tidak perlu cape bertanya 'halo, apakah ada air?' setiap detik (polling). Begitu air siap, ia akan langsung menyembur ke arahmu!"
+                  </p>
+                  <div className="mt-8 flex gap-3 text-sm font-medium">
+                     <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-lg flex items-center gap-1"><span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> Intuitif</span>
+                     <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-lg">Real-time</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* TESTIMONIAL SECTION */}
+            <div className="w-full max-w-5xl mb-32 relative z-10 flex flex-col items-center">
+              <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-12 text-center">Telah Membantu Ribuan Otak Mencerna Teori</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+                <div className="bg-white/[0.02] border border-white/5 p-8 rounded-3xl hover:bg-white/[0.04] transition-colors duration-300">
+                  <div className="flex gap-1 text-emerald-400 mb-6 text-xs">★★★★★</div>
+                  <p className="text-sm text-white/70 leading-relaxed mb-8">"Gue mahasiswa IT tapi suka blank kalau baca dokumentasi AWS. Masukin ke sini, tiba-tiba ngerti konsep Load Balancer lewat analogi tukang parkir. Gila sih!"</p>
+                  <div className="flex items-center gap-3 mt-auto">
+                     <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center font-bold text-xs ring-2 ring-white/10 shadow-lg">AJ</div>
+                     <div>
+                       <div className="text-sm font-bold">Aji Pangestu</div>
+                       <div className="text-xs text-white/40">Mahasiswa Ilmu Komputer</div>
+                     </div>
+                  </div>
+                </div>
+                <div className="bg-white/[0.02] border border-white/5 p-8 rounded-3xl hover:bg-white/[0.04] transition-colors duration-300">
+                  <div className="flex gap-1 text-emerald-400 mb-6 text-xs">★★★★★</div>
+                  <p className="text-sm text-white/70 leading-relaxed mb-8">"Dulu susah banget jelasin inflasi ke murid SMA. Berkat Sederhanain, mereka ngerti lewat simulasi harga cilok yang makin naik karena uang yang beredar bertambah."</p>
+                  <div className="flex items-center gap-3 mt-auto">
+                     <div className="w-10 h-10 bg-gradient-to-br from-pink-500 to-orange-500 rounded-full flex items-center justify-center font-bold text-xs ring-2 ring-white/10 shadow-lg">SM</div>
+                     <div>
+                       <div className="text-sm font-bold">Sarah Monica</div>
+                       <div className="text-xs text-white/40">Guru Ekonomi SMA</div>
+                     </div>
+                  </div>
+                </div>
+                <div className="bg-white/[0.02] border border-white/5 p-8 rounded-3xl hover:bg-white/[0.04] transition-colors duration-300">
+                  <div className="flex gap-1 text-emerald-400 mb-6 text-xs">★★★★★</div>
+                  <p className="text-sm text-white/70 leading-relaxed mb-8">"Aplikasi ini parah kerennya. Gue yang orang bisnis jadi paham bedanya API sama Webhook cuma dalam 10 detik baca analogi pelayan restoran. Sangat membantu kerja!"</p>
+                  <div className="flex items-center gap-3 mt-auto">
+                     <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-full flex items-center justify-center font-bold text-xs ring-2 ring-white/10 shadow-lg">BW</div>
+                     <div>
+                       <div className="text-sm font-bold">Budi Waseso</div>
+                       <div className="text-xs text-white/40">Product/Project Manager</div>
+                     </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* FAQ SECTION */}
+            <div className="w-full max-w-3xl mb-32 relative z-10 flex flex-col items-center">
+              <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-3 text-center">Pertanyaan yang Sering Muncul 🤔</h2>
+              <p className="text-white/50 mb-10 text-center text-sm md:text-base">Mungkin kamu punya salah satu pertanyaan ini.</p>
+              
+              <div className="w-full flex flex-col gap-4">
+                <div className="bg-white/[0.02] border border-white/5 p-6 rounded-2xl group hover:border-emerald-500/20 hover:bg-white/[0.04] transition-all duration-300">
+                   <h3 className="font-bold text-emerald-400 mb-2 flex justify-between items-center">
+                     Apakah Sederhanain 100% gratis?
+                   </h3>
+                   <p className="text-sm text-white/60 leading-relaxed mt-2">Ya! Karena ini masih versi Beta eksploratif, kamu bisa menganalisis topik apa saja tanpa batasan kuota pencarian setiap hari.</p>
+                </div>
+                <div className="bg-white/[0.02] border border-white/5 p-6 rounded-2xl group hover:border-emerald-500/20 hover:bg-white/[0.04] transition-all duration-300">
+                   <h3 className="font-bold text-emerald-400 mb-2 flex justify-between items-center">
+                     Teknologi gila apa yang ada di baliknya?
+                   </h3>
+                   <p className="text-sm text-white/60 leading-relaxed mt-2">Kami mengandalkan kombinasi ajaib dari <b>Google Gemini API</b> (untuk bernalar luar biasa dan meracik analogi), serta <b>React & Tailwind</b> untuk merender UI yang interaktif (Generative UI) secara instan.</p>
+                </div>
+                <div className="bg-white/[0.02] border border-white/5 p-6 rounded-2xl group hover:border-emerald-500/20 hover:bg-white/[0.04] transition-all duration-300">
+                   <h3 className="font-bold text-emerald-400 mb-2 flex justify-between items-center">
+                     Topik apa yang pas dicoba?
+                   </h3>
+                   <p className="text-sm text-white/60 leading-relaxed mt-2">Bebas! Cobalah memasukkan kata kunci bidang IT (seperti Docker, Kubernetes, React Effect), Teori Fisika (Relativitas, Kucing Schrödinger), sampai istilah Finansial (Inflasi, Deflasi, Reksadana).</p>
+                </div>
+              </div>
+            </div>
           </div>
+        </div>
         )}
 
         {isLoading && (
@@ -134,7 +366,7 @@ export default function App() {
 
         {data && (
           <>
-            <aside className="w-full md:w-[340px] border-r border-white/10 bg-[#0a0a0a] p-8 flex flex-col overflow-y-auto shrink-0 relative z-10">
+            <aside className="w-full md:w-[340px] border-r border-white/10 bg-[#0a0a0a] p-8 flex flex-col shrink-0 relative z-10">
               <div className="mb-10">
                 <h2 className="text-[11px] uppercase tracking-[0.2em] text-emerald-400 font-bold mb-2">Tema Analogi</h2>
                 <h3 className="text-3xl font-light leading-tight mb-4">{data.analogyTheme}</h3>
@@ -153,7 +385,7 @@ export default function App() {
                     )}
                     <h4 className={`text-[10px] uppercase tracking-widest mb-1 ${idx === currentStepIdx ? 'text-emerald-400' : 'text-white/40'}`}>Langkah 0{idx + 1}</h4>
                     <p className={`text-sm ${idx === currentStepIdx ? 'font-bold text-white' : idx < currentStepIdx ? 'font-medium opacity-60' : 'font-medium opacity-40'}`}>
-                       {step.visualState}: {step.title}
+                       {step.visualState}: {sanitizeTitle(step.title)}
                     </p>
                   </div>
                 ))}
@@ -208,6 +440,66 @@ export default function App() {
           </>
         )}
       </main>
+
+      {!data && !isLoading && (
+        <div className="w-full shrink-0 relative z-10 mt-auto">
+          {/* CTA SECTION */}
+          <div className="max-w-4xl mx-auto px-6 py-20 md:py-24 flex flex-col items-center text-center">
+            <h2 className="text-3xl md:text-5xl font-black tracking-tighter uppercase mb-6">
+              Siap Mencerna <span className="text-emerald-400">Konsep Rumit?</span>
+            </h2>
+            <p className="text-white/60 mb-10 max-w-xl leading-relaxed">
+              Berhenti membuang waktu memahami dokumentasi yang membosankan. Biarkan AI kami yang menerjemahkannya ke dalam bahasa manusia untukmu.
+            </p>
+            <button 
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="bg-emerald-500 hover:bg-emerald-400 text-[#050505] px-8 py-4 rounded-full font-bold transition-all hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)]"
+            >
+              Mulai Coba Gratis 🚀
+            </button>
+          </div>
+
+          {/* FOOTER */}
+          <footer className="w-full border-t border-white/5 px-6 py-12 md:px-12 relative z-10">
+            <div className="max-w-7xl mx-auto">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-12">
+                {/* Brand & Description */}
+                <div className="col-span-1 md:col-span-4 flex flex-col gap-4">
+                  <span className="text-2xl font-black tracking-tighter uppercase text-emerald-400">
+                    Sederhanain.
+                  </span>
+                  <p className="text-sm text-white/50 leading-relaxed pr-4">
+                    Mengubah konsep abstrak dan teori yang rumit menjadi analogi interaktif yang menyenangkan. Belajar tidak pernah se-intuitif ini.
+                  </p>
+                </div>
+
+                {/* Quick Links & Disclaimer */}
+                <div className="col-span-1 md:col-span-8 flex flex-col sm:flex-row gap-10 md:justify-end">
+                  <div className="flex flex-col gap-4">
+                    <h4 className="text-emerald-400 font-bold mb-1 uppercase tracking-wider text-xs">Quick Links</h4>
+                    <a href="#" className="text-sm text-white/60 hover:text-emerald-400 hover:translate-x-1 transition-all w-fit">Tentang Kami</a>
+                    <a href="#" className="text-sm text-white/60 hover:text-emerald-400 hover:translate-x-1 transition-all w-fit">GitHub Repository</a>
+                    <a href="#" className="text-sm text-white/60 hover:text-emerald-400 hover:translate-x-1 transition-all w-fit">Privacy Policy</a>
+                  </div>
+                  
+                  <div className="flex flex-col gap-4 max-w-sm">
+                    <h4 className="text-emerald-400 font-bold mb-1 uppercase tracking-wider text-xs">AI Disclaimer 🤖</h4>
+                    <p className="text-xs text-white/40 leading-relaxed bg-white/5 p-4 rounded-xl border border-white/5">
+                      Platform ini ditenagai oleh Generative AI. Analogi yang dihasilkan mungkin tidak 100% akurat secara teknis atau saintifik. Gunakan aplikasi ini sebagai jembatan pemahaman awal, bukan sumber kebenaran mutlak.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Copyright */}
+              <div className="border-t border-white/10 pt-8 flex flex-col-reverse md:flex-row justify-between items-center gap-4 text-xs text-white/40 font-mono tracking-wide">
+                <p>© 2026 Sederhanain. All rights reserved.</p>
+                <p>Built with Google AI Studio</p>
+              </div>
+            </div>
+          </footer>
+        </div>
+      )}
     </div>
   );
 }
@@ -225,13 +517,13 @@ function VisualStage({
 }) {
   let layoutClasses = "flex-row items-center justify-between";
   if (layoutType === "SPLIT_LANES") {
-    layoutClasses = "flex-col items-center justify-around py-8";
+    layoutClasses = "flex-col items-center justify-around gap-12 py-8";
   } else if (layoutType === "HUB_AND_SPOKE") {
-    layoutClasses = "flex-row items-center justify-center gap-16 md:gap-24 flex-wrap";
+    layoutClasses = "flex-row items-center justify-center gap-10 md:gap-16 flex-wrap";
   }
 
   return (
-    <div className={`relative w-[300px] md:w-[500px] h-[300px] flex ${layoutClasses} z-10 px-6`}>
+    <div className={`relative w-full max-w-2xl min-h-[400px] flex ${layoutClasses} z-10 px-4 md:px-12 py-12`}>
       {/* Background interaction circles */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
         <div className="w-[300px] h-[300px] md:w-[400px] md:h-[400px] rounded-full border border-white/[0.03] animate-pulse"></div>
@@ -257,16 +549,16 @@ function VisualStage({
                delay: idx * 0.1,
                repeat: isAnimatedNode && ["pulse", "spin", "shake"].includes(animationConfig.effect) ? Infinity : 0
              }}
-             className="relative flex flex-col items-center z-20"
+             className="relative flex flex-col items-center z-20 w-32 md:w-40 text-center"
           >
-            <div className={`w-20 h-20 md:w-24 md:h-24 rounded-full border-4 flex items-center justify-center bg-[#050505] transition-colors duration-500 ${visualState === 'BROKEN' ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]'}`}>
+            <div className={`w-20 h-20 md:w-24 md:h-24 shrink-0 rounded-full border-4 flex items-center justify-center bg-[#050505] transition-colors duration-500 ${visualState === 'BROKEN' ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]'}`}>
                <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-xl md:text-2xl ${visualState === 'BROKEN' ? 'bg-red-500/20' : 'bg-emerald-500/20'}`}>
                   {ent.visualAsset || <div className={`w-3 h-3 md:w-4 md:h-4 rounded-full ${visualState === 'BROKEN' ? 'bg-red-500 shadow-[0_0_10px_#ef4444]' : 'bg-emerald-500 shadow-[0_0_10px_#10b981]'}`}></div>}
                </div>
             </div>
-            <div className="absolute top-full mt-4 flex flex-col items-center bg-[#050505] bg-opacity-80 p-1 rounded backdrop-blur">
-              <span className="text-[9px] md:text-[10px] font-mono tracking-widest text-white/40 uppercase bg-black/50 px-2 py-0.5 rounded shadow whitespace-nowrap">{ent.techName}</span>
-              <span className="mt-1 text-xs md:text-sm font-medium text-white text-center whitespace-nowrap">{ent.analogyName}</span>
+            <div className="mt-4 flex flex-col items-center gap-1.5 w-full bg-[#050505]/60 p-2 rounded-xl backdrop-blur-sm border border-white/5">
+              <span className="text-[9px] md:text-[10px] font-mono tracking-widest text-white/40 uppercase bg-black/50 px-2 py-0.5 rounded shadow whitespace-normal break-words max-w-full leading-tight">{ent.techName}</span>
+              <span className="text-xs md:text-sm font-medium text-white text-center whitespace-normal break-words max-w-full leading-snug">{ent.analogyName}</span>
             </div>
           </motion.div>
         );
@@ -287,7 +579,7 @@ function ConnectionLine({
   const isVertical = layoutType === "SPLIT_LANES";
   
   const rotationClass = isVertical ? "rotate-90 origin-center" : "";
-  const containerClass = `absolute inset-0 w-full h-full z-10 pointer-events-none flex items-center justify-center`;
+  const containerClass = `absolute inset-0 w-full h-full ${visualState === "BROKEN" ? "z-30" : "z-10"} pointer-events-none flex items-center justify-center`;
 
   if (visualState === "SETUP") {
     return (
@@ -298,13 +590,17 @@ function ConnectionLine({
   }
 
   if (visualState === "BROKEN") {
+    let offsetClass = "-mt-24"; // Pipeline offset
+    if (layoutType === "SPLIT_LANES") offsetClass = "ml-32";
+    if (layoutType === "HUB_AND_SPOKE") offsetClass = "mt-32";
+
     return (
       <div className={containerClass}>
         <svg className={`absolute inset-0 w-full h-full pointer-events-none opacity-50 ${rotationClass}`}>
            <line x1="20%" y1="50%" x2="45%" y2="50%" stroke="#ef4444" strokeWidth="2" strokeDasharray="4 8" />
            <line x1="55%" y1="50%" x2="80%" y2="50%" stroke="#ef4444" strokeWidth="2" strokeDasharray="4 8" />
         </svg>
-        <div className="bg-black/80 backdrop-blur border border-red-500 text-red-500 text-[9px] uppercase tracking-widest font-bold px-3 py-1 font-mono rounded relative z-20">DISCONNECTED</div>
+        <div className={`absolute ${offsetClass} bg-black/80 backdrop-blur border border-red-500 text-red-500 text-[9px] uppercase tracking-widest font-bold px-3 py-1 font-mono rounded z-20`}>DISCONNECTED</div>
       </div>
     );
   }

@@ -25,23 +25,114 @@ async function startServer() {
         return res.status(400).json({ error: "Concept is required" });
       }
 
-      const prompt = `Kamu adalah mesin backend berbasis AI untuk aplikasi bernama "Sederhanain". Ikuti instruksi di bawah ini dengan sangat ketat untuk memproses input dari pengguna. Tugasmu adalah menerima satu kata kunci konsep abstrak, teknis, atau ilmiah dari pengguna. Terjemahkan konsep tersebut menjadi satu tema cerita analogi dunia nyata yang utuh dan logis, lalu bagi cerita tersebut menjadi beberapa tahapan simulasi yang terstruktur.
+      const prompt = `Kamu adalah mesin backend berbasis AI untuk aplikasi bernama "Sederhanain". Ikuti instruksi di bawah ini dengan sangat ketat untuk memproses input dari pengguna.
 
-Frontend kami menggunakan komponen geometri universal (Lingkaran sebagai entitas, Garis sebagai konektor, dan Titik Menyala sebagai energi/data). Oleh karena itu, kamu wajib memetakan setiap langkah cerita ke dalam salah satu dari 4 status visual baku di bawah ini (gunakan huruf kapital):
-A) SETUP: Tahap persiapan. Entitas diperkenalkan di layar, namun belum ada hubungan/aksi.
-B) PROCESSING: Tahap inisiasi atau pengiriman sinyal. Ada pergerakan awal antar entitas.
-C) ACTIVE: Tahap sistem bekerja penuh. Aliran energi/data sedang berjalan lancar secara terus-menerus.
-D) BROKEN: Tahap penutup, atau simulasi selesai, atau kondisi ketika sistem sengaja dirusak/dimatikan untuk melihat efeknya.
+1. TENTUKAN TASK
+Tugasmu adalah menerima satu kata kunci konsep abstrak, baik di bidang teknologi (IT) maupun non-teknologi seperti sains, biologi, ekonomi, sosiologi, sejarah, dll (misalnya: "WebSockets", "Async vs Sync", "Black Hole", "Inflasi Ekonomi"). Terjemahkan konsep tersebut menjadi satu tema cerita analogi dunia nyata yang utuh, tentukan tata letak visualnya, pilih emoji pendukungnya, dan bagi cerita tersebut menjadi beberapa tahapan simulasi yang terstruktur dalam bentuk JSON.
 
-Seluruh teks penjelasan wajib ditulis menggunakan Bahasa Indonesia yang santai, mudah dipahami orang awam, namun tetap akurat secara analogi.
+2. BERI CONTEXT
+Hasil JSON darimu akan dibaca oleh aplikasi Frontend (React + Tailwind) untuk merender komponen visual secara dinamis (Generative UI). 
+- Kami menyediakan 3 jenis tata letak (layoutType): 
+  1. "PIPELINE" (Alur horizontal kiri-kanan, cocok untuk proses mengalir/timbal balik).
+  2. "SPLIT_LANES" (Alur vertikal atas-bawah, cocok untuk perbandingan paralel/balapan/simultan).
+  3. "HUB_AND_SPOKE" (Satu pusat di tengah dikelilingi banyak cabang).
+- Setiap entitas harus memiliki peran yang jelas agar tidak tumpang tindih secara logika di panggung visual. Gunakan Emoji (visualAsset) sebagai avatar unik untuk tiap entitas.
+- Kami memisahkan dengan ketat antara apa yang dilihat manusia (tampilan UI) dan apa yang dibaca oleh kode robot Frontend (untuk animasi CSS).
 
-Tambahan aturan ketat:
-1. "layoutType": Pilih salah satu dari: "PIPELINE" (Alur horizontal kiri-kanan), "SPLIT_LANES" (Alur vertikal atas-bawah), atau "HUB_AND_SPOKE" (Satu pusat di tengah dikelilingi cabang).
-2. "visualAsset": Berikan 1 EMOJI yang paling menggambarkan peran fisik entitas tersebut di setiap objek entitas.
-3. "animationConfig": Untuk tiap step simulasi, berikan objek konfigurasi animasi dengan properti speed ("none", "slow", "fast"), direction ("none", "forward", "backward", "bidirectional"), dan effect ("none", "ping", "pulse", "stream", "spin", "shake", "race").
-4. Aturan Ketat untuk Objek di dalam "simulationSteps":
-   - "title" adalah JUDUL LANGKAH YANG DILIHAT MANUSIA. Tulis secara kreatif, natural, dan sepenuhnya fleksibel sesuai dengan konteks topik. DILARANG keras memasukkan kata "SETUP", "PROCESSING", "ACTIVE", atau "BROKEN" ke dalam properti "title" ini.
-   - "visualState" adalah KODE ROBOT UNTUK FRONTEND. Ini adalah variabel tersembunyi untuk mengatur animasi CSS. Nilainya wajib berupa ENUM kaku ("SETUP" | "PROCESSING" | "ACTIVE" | "BROKEN") yang paling mendekati situasi mekanis pada langkah tersebut.
+3. BERI EXAMPLE
+Jika pengguna memasukkan input: "Black Hole", maka hasil ideal yang harus kamu kembalikan adalah seperti ini:
+
+{
+  "techConcept": "Black Hole",
+  "layoutType": "HUB_AND_SPOKE",
+  "analogyTheme": "Raksasa di Kolam Renang",
+  "overview": "Bayangkan Black Hole adalah sebuah lubang pembuangan super kuat di tengah kolam renang raksasa yang tidak punya dasar. Apapun yang berenang terlalu dekat, termasuk cahaya, bakal terisap masuk dan hilang selamanya.",
+  "entities": [
+    {
+      "id": "ent-1",
+      "techName": "Matter & Light",
+      "analogyName": "Bebek Karet & Air",
+      "description": "Objek malang yang berenang terlalu dekat dengan pusaran.",
+      "visualAsset": "🦆"
+    },
+    {
+      "id": "ent-2",
+      "techName": "Event Horizon",
+      "analogyName": "Bibir Pusaran",
+      "description": "Batas aman terakhir. Jika melewati titik ini, tidak ada jalan kembali.",
+      "visualAsset": "🌀"
+    },
+    {
+      "id": "ent-3",
+      "techName": "Singularity",
+      "analogyName": "Lubang Tanpa Dasar",
+      "description": "Titik inti pembuangan tempat semua materi hancur dan lenyap.",
+      "visualAsset": "🕳️"
+    }
+  ],
+  "simulationSteps": [
+    {
+      "step": 1,
+      "title": "Suasana Kolam yang Tenang",
+      "techAction": "Objek berada di ruang hampa udara jauh dari gaya tarik koordinat singularity.",
+      "analogyAction": "Bebek karet mengapung santai di pojok kolam, belum menyadari adanya bahaya.",
+      "visualState": "SETUP",
+      "animationConfig": {
+        "speed": "none",
+        "direction": "none",
+        "effect": "pulse"
+      }
+    },
+    {
+      "step": 2,
+      "title": "Air Mulai Berputar",
+      "techAction": "Objek mulai memasuki medan gravitasi luar dan terakselerasi.",
+      "analogyAction": "Bebek karet mulai bergerak terseret arus pelan, berputar mengitari bibir pusaran.",
+      "visualState": "PROCESSING",
+      "animationConfig": {
+        "speed": "slow",
+        "direction": "forward",
+        "effect": "spin"
+      }
+    },
+    {
+      "step": 3,
+      "title": "Terjebak di Pusaran Maut",
+      "techAction": "Materi melewati Event Horizon dan mengalami tarikan ekstrem menuju titik pusat.",
+      "analogyAction": "Arus menjadi sangat deras! Bebek karet tersedot cepat berputar-putar menuju lubang inti.",
+      "visualState": "ACTIVE",
+      "animationConfig": {
+        "speed": "fast",
+        "direction": "forward",
+        "effect": "stream"
+      }
+    },
+    {
+      "step": 4,
+      "title": "Hilang Ditelan Kegelapan",
+      "techAction": "Materi hancur total dan menyatu di titik singularitas.",
+      "analogyAction": "Bebek karet masuk ke dalam lubang pembuangan dan hilang sama sekali dari pandangan.",
+      "visualState": "BROKEN",
+      "animationConfig": {
+        "speed": "none",
+        "direction": "none",
+        "effect": "shake"
+      }
+    }
+  ]
+}
+
+4. ATUR FORMAT
+- Keluaran HARUS berupa JSON murni yang valid sesuai dengan struktur pada contoh di atas.
+- Jangan berikan kalimat pengantar di awal (seperti "Tentu, ini hasilnya:") atau kalimat penutup di akhir.
+- Seluruh teks penjelasan wajib ditulis menggunakan Bahasa Indonesia yang santai, edukatif, mudah dipahami orang awam, namun tetap akurat secara analogi.
+- Aturan Ketat Properti "title" di dalam "simulationSteps": Tulis judul langkah secara kreatif, fleksibel, puitis, dan natural sesuai konteks cerita (Contoh: "Suasana Kolam yang Tenang", "Terjebak di Pusaran Maut"). DILARANG KERAS memasukkan kata "SETUP", "PROCESSING", "ACTIVE", atau "BROKEN" ke dalam properti "title" ini.
+- Kamu HARUS mematuhi batasan nilai (Enum) berikut untuk kebutuhan mesin Frontend:
+  * \`layoutType\` hanya boleh berisi: "PIPELINE", "SPLIT_LANES", atau "HUB_AND_SPOKE".
+  * \`visualState\` hanya boleh berisi: "SETUP", "PROCESSING", "ACTIVE", atau "BROKEN".
+  * \`animationConfig.speed\` hanya boleh berisi: "none", "slow", atau "fast".
+  * \`animationConfig.direction\` hanya boleh berisi: "none", "forward", "backward", atau "bidirectional".
+  * \`animationConfig.effect\` hanya boleh berisi: "none", "ping", "pulse", "stream", "spin", "shake", atau "race".
 
 Input pengguna yang harus kamu eksekusi saat ini adalah: "${concept}"`;
 
