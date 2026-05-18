@@ -259,6 +259,12 @@ Input pengguna yang harus kamu eksekusi saat ini adalah: "${concept}"`;
     }
   });
 
+  app.get("/api/config", (req, res) => {
+    res.json({
+      googleClientId: process.env.VITE_GOOGLE_CLIENT_ID,
+    });
+  });
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },

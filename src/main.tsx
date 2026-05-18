@@ -4,12 +4,26 @@ import App from './App.tsx';
 import './index.css';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
-const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID';
+async function init() {
+  let clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <GoogleOAuthProvider clientId={clientId}>
-      <App />
-    </GoogleOAuthProvider>
-  </StrictMode>,
-);
+  try {
+    const res = await fetch('/api/config');
+    const data = await res.json();
+    if (data.googleClientId) {
+      clientId = data.googleClientId;
+    }
+  } catch (error) {
+    console.warn("Failed to fetch runtime config, falling back to build-time vars", error);
+  }
+
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <GoogleOAuthProvider clientId={clientId || 'YOUR_GOOGLE_CLIENT_ID'}>
+        <App />
+      </GoogleOAuthProvider>
+    </StrictMode>,
+  );
+}
+
+init();
