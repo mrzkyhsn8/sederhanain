@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Loader2, ChevronRight, ChevronLeft, LogOut } from "lucide-react";
 import { useGoogleLogin, googleLogout } from '@react-oauth/google';
@@ -551,8 +551,8 @@ export default function App() {
 
               <div className="space-y-6 mb-8 flex-1 overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
                 {data.simulationSteps.map((step, idx) => (
-                  <div 
-                    key={idx} 
+                  <div
+                    key={idx}
                     onClick={() => setCurrentStepIdx(idx)}
                     className={`relative pl-8 border-l py-1 cursor-pointer transition-all duration-300 group
                       ${idx <= currentStepIdx ? 'border-emerald-500' : 'border-white/10'}
@@ -591,7 +591,7 @@ export default function App() {
                       <p className="text-sm text-white/80 leading-relaxed italic border-l block border-emerald-500/50 pl-3 py-1 font-serif line-clamp-2">
                         "{data.simulationSteps[currentStepIdx].analogyAction}"
                       </p>
-                      <p className="text-[10px] tracking-wider uppercase text-emerald-400/60 font-mono truncate">
+                      <p className="text-[10px] tracking-wider uppercase text-emerald-400/60 font-mono">
                         <span className="opacity-50">TECH:</span> {data.simulationSteps[currentStepIdx].techAction}
                       </p>
                     </motion.div>

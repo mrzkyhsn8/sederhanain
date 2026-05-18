@@ -17,7 +17,7 @@ const ai = new GoogleGenAI({
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT || 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   app.set('trust proxy', 1);
 
@@ -36,11 +36,11 @@ async function startServer() {
       const response = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (!response.ok) {
         throw new Error("Invalid token response from Google");
       }
-      
+
       const payload = await response.json();
       if (payload && payload.email) {
         req.userEmail = payload.email;
@@ -65,8 +65,8 @@ async function startServer() {
     },
     skip: (req: any) => {
       if (!req.userEmail) return false;
-      const whitelist = process.env.WHITELIST_EMAILS 
-        ? process.env.WHITELIST_EMAILS.split(",").map(e => e.trim().toLowerCase()) 
+      const whitelist = process.env.WHITELIST_EMAILS
+        ? process.env.WHITELIST_EMAILS.split(",").map(e => e.trim().toLowerCase())
         : [];
       return whitelist.includes(req.userEmail.toLowerCase());
     }
