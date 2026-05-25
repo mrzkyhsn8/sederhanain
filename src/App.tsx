@@ -5,8 +5,13 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Loader2, ChevronRight, ChevronLeft, LogOut } from "lucide-react";
+import { Loader2, ChevronRight, ChevronLeft, LogOut, Command, Search, X, AlertOctagon, Sparkles, Lock } from "lucide-react";
 import { useGoogleLogin, googleLogout } from '@react-oauth/google';
+
+interface StepVisual {
+  svgContent: string;
+  primaryColor: string;
+}
 
 interface Entity {
   id: string;
@@ -14,6 +19,7 @@ interface Entity {
   analogyName: string;
   description: string;
   visualAsset: string;
+  stepVisuals?: StepVisual[];
 }
 
 interface AnimationConfig {
@@ -56,6 +62,10 @@ export default function App() {
   const [data, setData] = useState<SederhanainData | null>(null);
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
   const [token, setToken] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<{ email: string; sub: string; name?: string; picture?: string } | null>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isCommandOpen, setIsCommandOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [history, setHistory] = useState<HistoryItem[]>(() => {
     try {
       const saved = localStorage.getItem("sederhanain_history");
@@ -64,6 +74,61 @@ export default function App() {
       return [];
     }
   });
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsCommandOpen((prev) => !prev);
+      }
+      if (e.key === "Escape") {
+        setIsCommandOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
+
+  useEffect(() => {
+    if (!isProfileOpen) return;
+    const handleClose = () => setIsProfileOpen(false);
+    window.addEventListener("click", handleClose);
+    return () => window.removeEventListener("click", handleClose);
+  }, [isProfileOpen]);
+
+  const fetchUserProfile = async (accessToken: string) => {
+    try {
+      const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: {
+          Authorization: `Bearer ${accessToken}`
+        }
+      });
+      const profile = await res.json();
+      if (profile.sub) {
+        setUserProfile(profile);
+        // Load history for this specific Google user
+        const saved = localStorage.getItem(`sederhanain_history_${profile.sub}`);
+        setHistory(saved ? JSON.parse(saved) : []);
+        return profile;
+      }
+    } catch (err) {
+      console.error("Failed to fetch user profile", err);
+    }
+    return null;
+  };
+
+  const handleLogout = () => {
+    googleLogout();
+    setToken(null);
+    setUserProfile(null);
+    // Reset history to anonymous local storage
+    try {
+      const saved = localStorage.getItem("sederhanain_history");
+      setHistory(saved ? JSON.parse(saved) : []);
+    } catch {
+      setHistory([]);
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -79,14 +144,15 @@ export default function App() {
   }, [data]);
 
   const login = useGoogleLogin({
-    onSuccess: (tokenResponse) => {
+    onSuccess: async (tokenResponse) => {
       setToken(tokenResponse.access_token);
-      executeAnalysis(conceptInput, tokenResponse.access_token);
+      const profile = await fetchUserProfile(tokenResponse.access_token);
+      executeAnalysis(conceptInput, tokenResponse.access_token, profile?.sub);
     },
     onError: () => alert('Google Login Failed'),
   });
 
-  const executeAnalysis = async (concept: string, currentToken?: string) => {
+  const executeAnalysis = async (concept: string, currentToken?: string, activeProfileSub?: string) => {
     if (!concept.trim()) return;
 
     const activeToken = currentToken || token;
@@ -112,12 +178,14 @@ export default function App() {
       if (json.error) throw new Error(json.error);
       setData(json);
 
-      // Save successful result to local storage history
+      // Save successful result to local storage history (namespaced by Google user profile if logged in)
       setHistory(prev => {
         const filtered = prev.filter(item => item.concept.toLowerCase() !== concept.toLowerCase());
         const updated = [{ concept, data: json, timestamp: Date.now() }, ...filtered].slice(0, 5);
         try {
-          localStorage.setItem("sederhanain_history", JSON.stringify(updated));
+          const sub = activeProfileSub || userProfile?.sub;
+          const key = sub ? `sederhanain_history_${sub}` : "sederhanain_history";
+          localStorage.setItem(key, JSON.stringify(updated));
         } catch (e) {
           console.error(e);
         }
@@ -144,13 +212,85 @@ export default function App() {
     setConceptInput(cleanTopic);
   };
 
+  const filteredHistory = history.filter(item =>
+    item.concept.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    item.data.analogyTheme.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const renderProfileMenu = () => {
+    if (!token || !userProfile) return null;
+
+    const initial = (userProfile.name || userProfile.email || "?").charAt(0).toUpperCase();
+
+    return (
+      <div className="relative z-50 shrink-0">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsProfileOpen((prev) => !prev);
+          }}
+          className="w-9 h-9 rounded-full border border-white/10 hover:border-emerald-500/50 shadow-md hover:shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all duration-300 relative overflow-hidden flex items-center justify-center shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-zinc-950"
+        >
+          {userProfile.picture ? (
+            <img
+              src={userProfile.picture}
+              alt={userProfile.name || userProfile.email}
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-sm font-mono font-bold text-white uppercase select-none">
+              {initial}
+            </div>
+          )}
+        </button>
+
+        {isProfileOpen && (
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute right-0 mt-2.5 w-60 bg-zinc-950/95 backdrop-blur-md border border-zinc-800 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] p-2 z-[999] animate-in fade-in slide-in-from-top-2 duration-150 origin-top-right text-left"
+          >
+            {/* User details */}
+            <div className="px-3 py-2.5">
+              {userProfile.name && (
+                <div className="text-xs font-bold text-zinc-100 truncate mb-0.5">
+                  {userProfile.name}
+                </div>
+              )}
+              <div className="text-[10px] font-mono text-zinc-500 truncate">
+                {userProfile.email}
+              </div>
+            </div>
+
+            <div className="border-t border-zinc-800 my-1"></div>
+
+            {/* Logout button */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsProfileOpen(false);
+                handleLogout();
+              }}
+              className="w-full text-left p-2.5 rounded-xl hover:bg-red-500/10 text-zinc-400 hover:text-red-400 text-xs font-semibold flex items-center gap-2 cursor-pointer transition-colors duration-150"
+            >
+              <LogOut className="w-3.5 h-3.5 shrink-0" />
+              <span>Logout</span>
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-[#050505] text-white flex flex-col font-sans selection:bg-emerald-500 selection:text-white">
+    <div className={`min-h-screen bg-[#050505] text-white flex flex-col font-sans selection:bg-emerald-500 selection:text-white ${data ? "md:h-screen md:overflow-hidden" : ""}`}>
       <AnimatePresence>
         {(data || isLoading) && (
           <motion.header
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, transition: { duration: 0 } }}
             className="h-20 px-8 flex items-center justify-between border-b border-white/10 shrink-0"
           >
             <div className="flex items-baseline gap-3">
@@ -160,10 +300,21 @@ export default function App() {
               >
                 Sederhanain.
               </button>
-              <span className="hidden md:inline text-[10px] uppercase tracking-[0.3em] font-medium text-white/40">AI Concept Visualizer v2.0</span>
+              <span className="hidden md:inline text-[10px] uppercase tracking-[0.3em] font-medium text-white/40">AI Concept Visualizer</span>
             </div>
 
             <div className="flex items-center gap-4">
+              <button
+                onClick={() => setIsCommandOpen(true)}
+                className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl text-xs font-mono text-emerald-400 font-semibold shadow-lg transition duration-200 cursor-pointer shrink-0"
+              >
+                <Command className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">CARI RIWAYAT</span>
+                <kbd className="hidden md:inline-block px-1.5 py-0.5 text-[9px] bg-black border border-white/10 text-zinc-500 rounded font-bold">
+                  Ctrl + K
+                </kbd>
+              </button>
+
               <motion.form layoutId="search-form" onSubmit={handleSubmit} className="flex gap-2 w-full max-w-[300px] md:max-w-md hidden md:flex">
                 <motion.input
                   layoutId="search-input"
@@ -183,37 +334,19 @@ export default function App() {
                 </motion.button>
               </motion.form>
 
-              {!token ? null : (
-                <button
-                  onClick={() => {
-                    googleLogout();
-                    setToken(null);
-                  }}
-                  className="text-white/50 hover:text-white text-xs flex items-center gap-1 border border-white/10 px-3 py-1.5 rounded-full"
-                >
-                  <LogOut className="w-3 h-3" /> Logout
-                </button>
-              )}
+              {renderProfileMenu()}
             </div>
           </motion.header>
         )}
       </AnimatePresence>
 
-      <main className="flex-1 flex flex-col-reverse md:flex-row relative">
+      <main className={`flex-1 flex flex-col-reverse md:flex-row relative ${data ? "md:h-[calc(100vh-80px)] md:overflow-hidden" : ""}`}>
         {!data && !isLoading && (
           <div className="w-full flex flex-col items-center relative z-10">
             {/* LOGOUT BUTTON FOR LOGGED IN USERS ON LANDING PAGE */}
             {token && (
               <div className="absolute top-6 right-8 z-50">
-                <button
-                  onClick={() => {
-                    googleLogout();
-                    setToken(null);
-                  }}
-                  className="text-white/50 hover:text-white text-xs flex items-center gap-1 border border-white/10 px-3 py-1.5 rounded-full bg-[#050505]/50 backdrop-blur-sm hover:border-white/20 transition-all"
-                >
-                  <LogOut className="w-3 h-3" /> Logout
-                </button>
+                {renderProfileMenu()}
               </div>
             )}
 
@@ -262,21 +395,29 @@ export default function App() {
                   </motion.button>
                 </motion.form>
 
+                {!token && (
+                  <div className="mt-6 flex justify-center relative z-20">
+                    <button
+                      type="button"
+                      onClick={() => login()}
+                      className="flex items-center gap-2.5 px-4 py-2 bg-zinc-950/60 hover:bg-zinc-900 border border-zinc-900 hover:border-zinc-800 rounded-xl font-mono text-xs text-zinc-600 hover:text-zinc-300 transition-all duration-300 shadow-md animate-in fade-in cursor-pointer"
+                    >
+                      <Lock className="w-3.5 h-3.5 text-zinc-700 animate-pulse" />
+                      <span>Lihat Riwayat Analisis Anda <strong className="text-emerald-500 font-semibold hover:underline">• Masuk</strong></span>
+                    </button>
+                  </div>
+                )}
+
                 {history.length > 0 && (
-                  <div className="mt-8 flex flex-wrap justify-center gap-2 max-w-2xl relative z-20">
-                    <span className="text-[10px] w-full text-center uppercase tracking-[0.3em] font-bold text-white/40 mb-1">Riwayat Analisis Anda:</span>
-                    {history.map((item, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          setConceptInput(item.concept);
-                          setData(item.data);
-                        }}
-                        className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-500/60 px-4 py-2 rounded-full text-xs font-semibold text-emerald-400 transition-all shadow-md shadow-emerald-500/5 hover:-translate-y-0.5 cursor-pointer"
-                      >
-                        {item.concept}
-                      </button>
-                    ))}
+                  <div className="mt-8 flex justify-center relative z-20">
+                    <button
+                      type="button"
+                      onClick={() => setIsCommandOpen(true)}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl text-xs font-mono text-emerald-400 font-semibold shadow-lg transition duration-200 cursor-pointer"
+                    >
+                      <Command className="w-3.5 h-3.5" />
+                      <span>CARI RIWAYAT ANDA ({history.length})</span>
+                    </button>
                   </div>
                 )}
 
@@ -540,7 +681,7 @@ export default function App() {
 
         {data && (
           <>
-            <aside className="w-full md:w-[340px] border-r border-white/10 bg-[#0a0a0a]/90 backdrop-blur-md p-6 md:p-8 flex flex-col shrink-0 relative z-20 shadow-2xl">
+            <aside className="w-full md:w-[340px] border-r border-white/10 bg-[#0a0a0a]/90 backdrop-blur-md p-6 md:p-8 flex flex-col shrink-0 relative z-20 shadow-2xl md:h-full md:overflow-y-auto md:[&::-webkit-scrollbar]:w-1.5 md:[&::-webkit-scrollbar-track]:bg-transparent md:[&::-webkit-scrollbar-thumb]:bg-white/10 md:[&::-webkit-scrollbar-thumb]:rounded-full md:hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
               <div className="mb-8">
                 <h2 className="text-[11px] uppercase tracking-[0.2em] text-emerald-400 font-bold mb-2">Tema Analogi</h2>
                 <h3 className="text-2xl md:text-3xl font-light leading-tight mb-3">{data.analogyTheme}</h3>
@@ -549,97 +690,278 @@ export default function App() {
                 </p>
               </div>
 
-              <div className="space-y-6 mb-8 flex-1 overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
-                {data.simulationSteps.map((step, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => setCurrentStepIdx(idx)}
-                    className={`relative pl-8 border-l py-1 cursor-pointer transition-all duration-300 group
-                      ${idx <= currentStepIdx ? 'border-emerald-500' : 'border-white/10'}
-                    `}
-                  >
-                    {idx === currentStepIdx ? (
-                      <div className="absolute -left-[7px] top-1.5 w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
-                    ) : (
-                      <div className={`absolute -left-[5px] top-2 w-2 h-2 rounded-full transition-colors duration-300 
-                        ${idx < currentStepIdx ? 'bg-emerald-500/50' : 'bg-white/20 group-hover:bg-white/40'}
-                      `}></div>
-                    )}
-                    <h4 className={`text-[10px] uppercase tracking-widest mb-1 transition-colors duration-300 
-                      ${idx === currentStepIdx ? 'text-emerald-400' : 'text-white/40 group-hover:text-white/60'}
-                    `}>Langkah 0{idx + 1}</h4>
-                    <p className={`text-sm transition-all duration-300 
-                      ${idx === currentStepIdx ? 'font-bold text-white' : idx < currentStepIdx ? 'font-medium text-white/70' : 'font-medium text-white/40 group-hover:text-white/60'}
-                    `}>
-                      {step.visualState}: {sanitizeTitle(step.title)}
-                    </p>
-                  </div>
-                ))}
+              <div className="space-y-1 mb-6 flex-1 md:overflow-y-visible overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
+                {data.simulationSteps.map((step, idx) => {
+                  const isActive = idx === currentStepIdx;
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => setCurrentStepIdx(idx)}
+                      className={`relative pl-8 border-l py-2 cursor-pointer transition-all duration-300 group
+                        ${idx <= currentStepIdx ? 'border-emerald-500' : 'border-white/10'}
+                      `}
+                    >
+                      {/* Timeline dot */}
+                      {isActive ? (
+                        <div className="absolute -left-[7px] top-2.5 w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
+                      ) : (
+                        <div className={`absolute -left-[5px] top-3 w-2 h-2 rounded-full transition-colors duration-300 
+                          ${idx < currentStepIdx ? 'bg-emerald-500/50' : 'bg-white/20 group-hover:bg-white/40'}
+                        `}></div>
+                      )}
+
+                      {/* Step label */}
+                      <h4 className={`text-[10px] uppercase tracking-widest mb-1 transition-colors duration-300 
+                        ${isActive ? 'text-emerald-400' : 'text-white/40 group-hover:text-white/60'}
+                      `}>Langkah {String(idx + 1).padStart(2, '0')}</h4>
+
+                      {/* Step title — no visualState label */}
+                      <p className={`text-sm transition-all duration-300 
+                        ${isActive ? 'font-bold text-white' : idx < currentStepIdx ? 'font-medium text-white/70' : 'font-medium text-white/40 group-hover:text-white/60'}
+                      `}>
+                        {sanitizeTitle(step.title)}
+                      </p>
+
+                      {/* Accordion: inline analogy + tech (only for active step) */}
+                      <AnimatePresence initial={false}>
+                        {isActive && (
+                          <motion.div
+                            key={`detail-${idx}`}
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.3, ease: "easeOut" }}
+                            className="overflow-hidden"
+                          >
+                            <div className="mt-3 flex flex-col gap-3 bg-white/[0.03] border border-white/5 rounded-xl p-4">
+                              {/* Analogy */}
+                              <div>
+                                <span className="text-[9px] uppercase tracking-widest text-emerald-400/70 font-bold block mb-1.5">Ibaratnya:</span>
+                                <p className="text-sm text-white/80 leading-relaxed italic py-0.5 font-serif">
+                                  "{step.analogyAction}"
+                                </p>
+                              </div>
+                              {/* Reality */}
+                              <div>
+                                <span className="text-[9px] uppercase tracking-widest font-bold block mb-1.5 text-amber-500">Kenyataannya:</span>
+                                <p className="text-[11px] text-white/50 leading-relaxed font-mono">
+                                  {step.techAction}
+                                </p>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })}
               </div>
 
-              <div className="mt-auto flex flex-col gap-4 border-t border-white/10 pt-6">
-                <div className="min-h-[96px] flex flex-col justify-center">
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={currentStepIdx}
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -15 }}
-                      transition={{ duration: 0.3, ease: "easeOut" }}
-                      className="flex flex-col gap-2"
-                    >
-                      <p className="text-sm text-white/80 leading-relaxed italic border-l block border-emerald-500/50 pl-3 py-1 font-serif line-clamp-2">
-                        "{data.simulationSteps[currentStepIdx].analogyAction}"
-                      </p>
-                      <p className="text-[10px] tracking-wider uppercase text-emerald-400/60 font-mono">
-                        <span className="opacity-50">TECH:</span> {data.simulationSteps[currentStepIdx].techAction}
-                      </p>
-                    </motion.div>
-                  </AnimatePresence>
-                </div>
-
-                <div className="flex gap-2 mt-2">
+              {/* Navigation buttons */}
+              <div className="mt-auto flex flex-col gap-3 border-t border-white/10 pt-5">
+                <div className="flex gap-2">
                   <button
                     onClick={() => setCurrentStepIdx(Math.max(0, currentStepIdx - 1))}
                     disabled={currentStepIdx === 0}
-                    className="w-10 h-10 rounded-lg border border-white/10 flex items-center justify-center hover:bg-white/5 disabled:opacity-20 transition-all text-white/70"
+                    className="w-10 h-10 rounded-xl border border-white/10 flex items-center justify-center hover:bg-white/5 disabled:opacity-20 transition-all text-white/70 shrink-0"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
-                  <button
-                    onClick={() => setCurrentStepIdx(Math.min(data.simulationSteps.length - 1, currentStepIdx + 1))}
-                    disabled={currentStepIdx === data.simulationSteps.length - 1}
-                    className="flex-1 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 flex items-center justify-center gap-2 font-bold uppercase text-[10px] tracking-widest hover:bg-emerald-500/20 disabled:opacity-20 transition-all disabled:hover:bg-emerald-500/10 hover:shadow-[0_0_15px_rgba(16,185,129,0.3)]"
-                  >
-                    <span>Next Step</span>
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+                  {currentStepIdx < data.simulationSteps.length - 1 ? (
+                    <button
+                      onClick={() => setCurrentStepIdx(currentStepIdx + 1)}
+                      className="flex-1 rounded-xl bg-emerald-500 text-black py-3.5 flex items-center justify-center gap-2 font-bold uppercase text-xs tracking-widest hover:bg-emerald-400 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] active:scale-[0.98]"
+                    >
+                      {/* <span>Langkah {currentStepIdx + 2} dari {data.simulationSteps.length}</span> */}
+                      <span>Selanjutnya</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { setData(null); setCurrentStepIdx(0); setConceptInput(''); }}
+                      className="flex-1 rounded-xl bg-white/10 text-white py-3.5 flex items-center justify-center gap-2 font-bold uppercase text-xs tracking-widest hover:bg-white/15 transition-all border border-white/10"
+                    >
+                      <span>Selesai ✓</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </aside>
 
-            <section className="flex-1 relative bg-[radial-gradient(#1a1a1a_1px,transparent_1px)] [background-size:32px_32px] overflow-hidden flex items-center justify-center min-h-[50vh] md:min-h-[400px]">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={currentStepIdx}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 1.05 }}
-                  transition={{ duration: 0.4 }}
-                  className="w-full h-full flex justify-center items-center absolute inset-0"
-                >
-                  <VisualStage
-                    entities={data.entities}
-                    visualState={data.simulationSteps[currentStepIdx].visualState}
-                    layoutType={data.layoutType}
-                    animationConfig={data.simulationSteps[currentStepIdx].animationConfig}
-                  />
-                </motion.div>
-              </AnimatePresence>
+            <section className="flex-1 relative bg-[radial-gradient(#1a1a1a_1px,transparent_1px)] [background-size:32px_32px] md:h-full md:overflow-y-auto flex flex-col items-center p-6 md:p-8 md:[&::-webkit-scrollbar]:w-1.5 md:[&::-webkit-scrollbar-track]:bg-transparent md:[&::-webkit-scrollbar-thumb]:bg-white/10 md:[&::-webkit-scrollbar-thumb]:rounded-full md:hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
+              {/* Status Header */}
+              <div className="w-full flex justify-between items-center mb-6 z-30 shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${data.simulationSteps[currentStepIdx].visualState === 'BROKEN' ? 'bg-red-400' : 'bg-emerald-400'}`}></span>
+                    <span className={`relative inline-flex rounded-full h-2 w-2 ${data.simulationSteps[currentStepIdx].visualState === 'BROKEN' ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
+                  </span>
+                  <span className="text-[10px] font-mono tracking-widest text-white/40 uppercase">ACTIVE STATE SIMULATION</span>
+                </div>
+                <div className={`px-3 py-1 border rounded-lg text-xs font-mono font-bold tracking-wider ${data.simulationSteps[currentStepIdx].visualState === 'SETUP'
+                  ? 'text-emerald-400 bg-emerald-950/50 border-emerald-500/30'
+                  : data.simulationSteps[currentStepIdx].visualState === 'PROCESSING'
+                    ? 'text-amber-400 bg-amber-950/50 border-amber-500/30'
+                    : data.simulationSteps[currentStepIdx].visualState === 'ACTIVE'
+                      ? 'text-red-500 bg-red-950/50 border-red-500/30 animate-pulse'
+                      : 'text-rose-600 bg-rose-950/60 border-rose-500/40 border-dashed animate-pulse'
+                  }`}>
+                  {data.simulationSteps[currentStepIdx].visualState === 'SETUP' ? 'SYSTEM READY'
+                    : data.simulationSteps[currentStepIdx].visualState === 'PROCESSING' ? 'WARNING: PROCESSING'
+                      : data.simulationSteps[currentStepIdx].visualState === 'ACTIVE' ? 'CRITICAL: ACTIVE'
+                        : 'DISCONNECTED / FAILURE'}
+                </div>
+              </div>
+
+              <div className="w-full flex-1 flex flex-col justify-center items-center my-auto pb-6 md:pb-10 z-10">
+                {/* System Container Box */}
+                <div className={`w-full p-6 rounded-2xl border transition-all duration-500 relative ${data.simulationSteps[currentStepIdx].visualState === 'SETUP'
+                  ? 'bg-zinc-950/40 border-white/10'
+                  : data.simulationSteps[currentStepIdx].visualState === 'PROCESSING'
+                    ? 'bg-amber-950/5 border-amber-950/30'
+                    : data.simulationSteps[currentStepIdx].visualState === 'ACTIVE'
+                      ? 'bg-red-950/5 border-red-950/30'
+                      : 'bg-zinc-950/80 border-rose-950/50 border-dashed'
+                  }`}>
+                  {/* System label watermark */}
+                  <div className="absolute top-2 left-4 text-[9px] font-mono tracking-wider text-white/30 uppercase">
+                    🧠 INTERNAL SYSTEM
+                  </div>
+
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={currentStepIdx}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 1.05 }}
+                      transition={{ duration: 0.4 }}
+                      className="w-full flex justify-center items-center pt-4"
+                    >
+                      <VisualStage
+                        entities={data.entities}
+                        visualState={data.simulationSteps[currentStepIdx].visualState}
+                        layoutType={data.layoutType}
+                        animationConfig={data.simulationSteps[currentStepIdx].animationConfig}
+                        currentStepIdx={currentStepIdx}
+                      />
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              </div>
             </section>
           </>
         )}
       </main>
+      {isCommandOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] px-4">
+          {/* Latar Belakang Gelap Transparan */}
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity duration-300"
+            onClick={() => setIsCommandOpen(false)}
+          />
+
+          {/* Kotak Pencarian Utama */}
+          <div className="bg-zinc-950 border border-zinc-800/80 w-full max-w-xl rounded-2xl shadow-2xl relative z-10 overflow-hidden text-zinc-100">
+
+            {/* INPUT FIELD PENCARIAN */}
+            <div className="p-4 border-b border-zinc-800 flex items-center gap-3">
+              <Search className="w-5 h-5 text-zinc-500 shrink-0" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Cari konsep, tema analogi, atau riwayat anda..."
+                className="w-full bg-transparent border-none text-sm text-zinc-100 placeholder-zinc-500 outline-none font-mono focus:ring-0 focus:outline-none"
+                autoFocus
+              />
+              <button
+                onClick={() => setIsCommandOpen(false)}
+                className="text-zinc-500 hover:text-zinc-300 p-1 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* DAFTAR HASIL PENCARIAN */}
+            <div className="max-h-[320px] overflow-y-auto p-2 space-y-4">
+
+              {/* Grup 1: Riwayat Analogi yang Tersedia */}
+              <div>
+                <span className="px-3 py-1 text-[9px] font-mono uppercase tracking-widest text-zinc-500 block mb-2">
+                  RIWAYAT PENCARIAN AKTIF ({filteredHistory.length})
+                </span>
+
+                {filteredHistory.length > 0 ? (
+                  <div className="space-y-1">
+                    {filteredHistory.map((item, idx) => {
+                      const isActiveTopic = data && item.concept.toLowerCase() === data.techConcept.toLowerCase();
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            setConceptInput(item.concept);
+                            setData(item.data);
+                            setCurrentStepIdx(0);
+                            setIsCommandOpen(false);
+                          }}
+                          className={`w-full text-left p-3 rounded-xl transition duration-150 flex items-center justify-between group cursor-pointer
+                            ${isActiveTopic
+                              ? 'bg-emerald-950/20 border border-emerald-500/20 text-emerald-400'
+                              : 'hover:bg-zinc-900/60 border border-transparent text-zinc-400 hover:text-white'
+                            }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`h-8 w-8 rounded-lg flex items-center justify-center border transition
+                              ${isActiveTopic
+                                ? 'bg-emerald-950 border-emerald-500/30 text-emerald-400'
+                                : 'bg-zinc-900 border-zinc-800 text-zinc-500 group-hover:text-emerald-400 group-hover:border-emerald-500/30'
+                              }`}
+                            >
+                              <Sparkles className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <span className="font-mono text-xs font-bold block">{item.concept}</span>
+                              <span className="text-[10px] text-zinc-500 block group-hover:text-zinc-400">{item.data.analogyTheme}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {isActiveTopic && (
+                              <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30">
+                                AKTIF
+                              </span>
+                            )}
+                            <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-300" />
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-zinc-500 text-xs font-mono">
+                    <AlertOctagon className="w-8 h-8 mx-auto mb-2 text-zinc-600" />
+                    Riwayat "{searchQuery}" tidak ditemukan.
+                  </div>
+                )}
+              </div>
+
+              {/* Tips Navigasi */}
+              <div className="border-t border-zinc-800 pt-3 px-3 flex justify-between items-center text-[10px] font-mono text-zinc-600">
+                <span className="flex items-center gap-1">
+                  <span className="px-1 py-0.5 bg-zinc-900 border border-zinc-800 rounded">ESC</span>
+                  <span>untuk menutup</span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="px-1 py-0.5 bg-zinc-900 border border-zinc-800 rounded">Click</span>
+                  <span>untuk memuat</span>
+                </span>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -648,33 +970,55 @@ function VisualStage({
   entities,
   visualState,
   layoutType,
-  animationConfig
+  animationConfig,
+  currentStepIdx
 }: {
   entities: Entity[],
   visualState: "SETUP" | "PROCESSING" | "ACTIVE" | "BROKEN",
   layoutType: "PIPELINE" | "SPLIT_LANES" | "HUB_AND_SPOKE",
-  animationConfig: AnimationConfig
+  animationConfig: AnimationConfig,
+  currentStepIdx: number
 }) {
-  let layoutClasses = "flex-row items-center justify-between";
-  if (layoutType === "SPLIT_LANES") {
-    layoutClasses = "flex-col items-center justify-around gap-12 py-8";
+  const isVertical = layoutType === "SPLIT_LANES";
+  let layoutClasses = "flex-row items-center justify-center";
+  if (isVertical) {
+    layoutClasses = "flex-col items-center justify-center";
   } else if (layoutType === "HUB_AND_SPOKE") {
-    layoutClasses = "flex-row items-center justify-center gap-10 md:gap-16 flex-wrap";
+    layoutClasses = "flex-row items-center justify-center flex-wrap gap-y-8";
   }
 
+  // Connection styling based on visual state
+  const strokeColor =
+    visualState === 'SETUP' ? '#10b981' :
+      visualState === 'PROCESSING' ? '#f59e0b' :
+        visualState === 'ACTIVE' ? '#ef4444' : '#52525b';
+  const flowClass =
+    visualState === 'SETUP' ? 'conduit-flow-active' :
+      visualState === 'PROCESSING' ? 'conduit-flow-stress' :
+        visualState === 'ACTIVE' ? 'conduit-flow-critical' : '';
+  const labelText =
+    visualState === 'BROKEN' ? 'TERPUTUS' :
+      animationConfig.direction === 'forward' ? 'Mengalir Ke' :
+        animationConfig.direction === 'backward' ? 'Dikembalikan' :
+          animationConfig.direction === 'bidirectional' ? 'Saling Terhubung' : 'Terhubung';
+  const isBroken = visualState === 'BROKEN';
+
   return (
-    <div className={`relative w-full max-w-2xl min-h-[400px] flex ${layoutClasses} z-10 px-4 md:px-12 py-12`}>
-      {/* Background interaction circles */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
-        <div className="w-[300px] h-[300px] md:w-[400px] md:h-[400px] rounded-full border border-white/[0.03] animate-pulse"></div>
-        <div className="absolute w-[450px] h-[450px] md:w-[600px] md:h-[600px] rounded-full border border-white/[0.02]"></div>
-      </div>
+    <div className={`relative w-full min-h-[400px] flex ${layoutClasses} z-10 px-4 md:px-12 py-12 gap-10 max-[640px]:scale-[0.6] max-[640px]:flex-nowrap origin-center transition-transform duration-300`}>
 
-      <ConnectionLine visualState={visualState} layoutType={layoutType} animationConfig={animationConfig} />
+      {entities.flatMap((ent, idx) => {
+        const isAnimatedNode = visualState === "PROCESSING" || visualState === "ACTIVE";
+        const stepVisual = ent.stepVisuals?.[currentStepIdx];
+        const hasSvg = stepVisual?.svgContent;
+        const primaryColor = stepVisual?.primaryColor || (visualState === 'BROKEN' ? '#e11d48' : '#10b981');
 
-      {entities.map((ent, idx) => {
-        let isAnimatedNode = visualState === "PROCESSING" || visualState === "ACTIVE";
-        return (
+        // Dynamic border/glow colors based on stepVisual primaryColor
+        const borderColor = hasSvg ? primaryColor : (visualState === 'BROKEN' ? '#ef4444' : '#10b981');
+        const glowOpacity = visualState === 'ACTIVE' ? '0.4' : visualState === 'PROCESSING' ? '0.25' : '0.15';
+
+        const items: React.ReactNode[] = [];
+
+        items.push(
           <motion.div
             key={ent.id}
             initial={{ scale: 0, opacity: 0 }}
@@ -691,102 +1035,97 @@ function VisualStage({
             }}
             className="relative flex flex-col items-center z-20 w-32 md:w-40 text-center"
           >
-            <div className={`w-20 h-20 md:w-24 md:h-24 shrink-0 rounded-full border-4 flex items-center justify-center bg-[#050505] transition-colors duration-500 ${visualState === 'BROKEN' ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]' : 'border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]'}`}>
-              <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-xl md:text-2xl ${visualState === 'BROKEN' ? 'bg-red-500/20' : 'bg-emerald-500/20'}`}>
-                {ent.visualAsset || <div className={`w-3 h-3 md:w-4 md:h-4 rounded-full ${visualState === 'BROKEN' ? 'bg-red-500 shadow-[0_0_10px_#ef4444]' : 'bg-emerald-500 shadow-[0_0_10px_#10b981]'}`}></div>}
-              </div>
+            <div
+              className={`w-20 h-20 md:w-24 md:h-24 shrink-0 rounded-full border-4 flex items-center justify-center bg-[#050505] transition-all duration-500 ${visualState === 'BROKEN' ? 'border-dashed' : ''
+                } ${visualState === 'ACTIVE' ? 'animate-pulse' : ''}`}
+              style={{
+                borderColor: borderColor,
+                boxShadow: `0 0 15px rgba(${hexToRgb(borderColor)}, ${glowOpacity})`,
+              }}
+            >
+              {hasSvg ? (
+                /* Render AI-generated SVG content */
+                <svg
+                  className="w-12 h-12 md:w-14 md:h-14 transition-all duration-500"
+                  viewBox="0 0 64 64"
+                  fill="none"
+                  dangerouslySetInnerHTML={{ __html: stepVisual!.svgContent }}
+                />
+              ) : (
+                /* Emoji fallback for backwards compatibility */
+                <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-xl md:text-2xl ${visualState === 'BROKEN' ? 'bg-red-500/20' : 'bg-emerald-500/20'}`}>
+                  {ent.visualAsset || <div className={`w-3 h-3 md:w-4 md:h-4 rounded-full ${visualState === 'BROKEN' ? 'bg-red-500 shadow-[0_0_10px_#ef4444]' : 'bg-emerald-500 shadow-[0_0_10px_#10b981]'}`}></div>}
+                </div>
+              )}
             </div>
             <div className="mt-4 flex flex-col items-center gap-1.5 w-full bg-[#050505]/60 p-2 rounded-xl backdrop-blur-sm border border-white/5">
-              <span className="text-[9px] md:text-[10px] font-mono tracking-widest text-white/40 uppercase bg-black/50 px-2 py-0.5 rounded shadow whitespace-normal break-words max-w-full leading-tight">{ent.techName}</span>
+              <span className="text-[9px] md:text-[10px] font-mono tracking-widest text-white/40 uppercase px-2 py-0.5 rounded shadow whitespace-normal break-words max-w-full leading-tight">{ent.techName}</span>
               <span className="text-xs md:text-sm font-medium text-white text-center whitespace-normal break-words max-w-full leading-snug">{ent.analogyName}</span>
             </div>
           </motion.div>
         );
+
+        // Connection segment between entities (inline, node-to-node)
+        if (idx < entities.length - 1) {
+          items.push(
+            <div
+              key={`conn-${idx}`}
+              className={`flex items-center justify-center relative z-10 ${isVertical
+                ? 'h-14 w-full flex-col'
+                : 'flex-1 min-w-[40px] max-w-[100px] self-center'
+                }`}
+            >
+              {isBroken ? (
+                <svg
+                  className={isVertical ? 'h-full w-6' : 'w-full h-6'}
+                  viewBox={isVertical ? '0 0 20 60' : '0 0 100 20'}
+                  fill="none"
+                >
+                  {isVertical ? (
+                    <>
+                      <line x1="10" y1="2" x2="10" y2="24" stroke="#52525b" strokeWidth="3" strokeDasharray="4 6" />
+                      <line x1="10" y1="36" x2="10" y2="58" stroke="#52525b" strokeWidth="3" strokeDasharray="4 6" />
+                    </>
+                  ) : (
+                    <>
+                      <line x1="2" y1="10" x2="42" y2="10" stroke="#52525b" strokeWidth="3" strokeDasharray="4 6" />
+                      <line x1="58" y1="10" x2="98" y2="10" stroke="#52525b" strokeWidth="3" strokeDasharray="4 6" />
+                    </>
+                  )}
+                </svg>
+              ) : (
+                <svg
+                  className={isVertical ? 'h-full w-6' : 'w-full h-6'}
+                  viewBox={isVertical ? '0 0 20 60' : '0 0 100 20'}
+                  fill="none"
+                  style={{ filter: `drop-shadow(0 0 6px ${strokeColor}40)` }}
+                >
+                  {isVertical ? (
+                    <line x1="10" y1="2" x2="10" y2="58" stroke={strokeColor} strokeWidth="3" strokeDasharray="8, 6" className={flowClass} />
+                  ) : (
+                    <line x1="2" y1="10" x2="98" y2="10" stroke={strokeColor} strokeWidth="3" strokeDasharray="8, 6" className={flowClass} />
+                  )}
+                </svg>
+              )}
+              {/* Relational label at midpoint */}
+              <span className={`absolute ${isVertical ? 'left-8' : '-bottom-5'} px-2 py-0.5 rounded text-[8px] font-mono font-bold tracking-tight uppercase whitespace-nowrap border bg-zinc-950 z-30 ${isBroken ? 'border-red-500/30 text-red-500/60' : 'border-white/10 text-white/40'
+                }`}>
+                {labelText}
+              </span>
+            </div>
+          );
+        }
+
+        return items;
       })}
     </div>
   );
 }
 
-function ConnectionLine({
-  visualState,
-  layoutType,
-  animationConfig
-}: {
-  visualState: "SETUP" | "PROCESSING" | "ACTIVE" | "BROKEN",
-  layoutType: "PIPELINE" | "SPLIT_LANES" | "HUB_AND_SPOKE",
-  animationConfig: AnimationConfig
-}) {
-  const isVertical = layoutType === "SPLIT_LANES";
-
-  const rotationClass = isVertical ? "rotate-90 origin-center" : "";
-  const containerClass = `absolute inset-0 w-full h-full ${visualState === "BROKEN" ? "z-30" : "z-10"} pointer-events-none flex items-center justify-center`;
-
-  if (visualState === "SETUP") {
-    return (
-      <svg className={`absolute inset-0 w-full h-full z-10 pointer-events-none ${rotationClass}`} style={{ filter: 'drop-shadow(0 0 8px rgba(16, 185, 129, 0.3))' }}>
-        <line x1="20%" y1="50%" x2="80%" y2="50%" stroke="#10b981" strokeWidth="2" strokeDasharray="8 12" className="opacity-30" />
-      </svg>
-    );
-  }
-
-  if (visualState === "BROKEN") {
-    let offsetClass = "-mt-24"; // Pipeline offset
-    if (layoutType === "SPLIT_LANES") offsetClass = "ml-32";
-    if (layoutType === "HUB_AND_SPOKE") offsetClass = "mt-32";
-
-    return (
-      <div className={containerClass}>
-        <svg className={`absolute inset-0 w-full h-full pointer-events-none opacity-50 ${rotationClass}`}>
-          <line x1="20%" y1="50%" x2="45%" y2="50%" stroke="#ef4444" strokeWidth="2" strokeDasharray="4 8" />
-          <line x1="55%" y1="50%" x2="80%" y2="50%" stroke="#ef4444" strokeWidth="2" strokeDasharray="4 8" />
-        </svg>
-        <div className={`absolute ${offsetClass} bg-black/80 backdrop-blur border border-red-500 text-red-500 text-[9px] uppercase tracking-widest font-bold px-3 py-1 font-mono rounded z-20`}>DISCONNECTED</div>
-      </div>
-    );
-  }
-
-  const animDuration = animationConfig.speed === "fast" ? 0.4 : (animationConfig.speed === "slow" ? 2.0 : 1.0);
-  const playState = visualState === "ACTIVE" ? Infinity : 0;
-  const isBidirectional = animationConfig.direction === "bidirectional";
-  const isBackward = animationConfig.direction === "backward";
-
-  return (
-    <div className={containerClass} style={{ filter: 'drop-shadow(0 0 8px rgba(16, 185, 129, 0.3))' }}>
-      <svg className={`absolute inset-0 w-full h-full ${rotationClass}`}>
-        <line x1="20%" y1="50%" x2="80%" y2="50%" stroke="#10b981" strokeWidth="2" strokeDasharray={visualState === "ACTIVE" ? "none" : "8 12"} className={visualState === "PROCESSING" ? "opacity-50" : ""} />
-      </svg>
-
-      {(visualState === "PROCESSING" || visualState === "ACTIVE") && animationConfig.direction !== "none" && animationConfig.effect !== "none" && (
-        <div className={`absolute w-[60%] h-2 overflow-hidden flex items-center justify-center ${rotationClass}`}>
-          {/* Main stream/dot */}
-          <motion.div
-            className={`absolute w-2 h-2 rounded-full ${animationConfig.effect === 'stream' ? 'w-full h-[2px] opacity-20 origin-left' : 'bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,1)]'}`}
-            initial={{ left: isBackward ? "100%" : "0%" }}
-            animate={{ left: isBackward ? "0%" : "100%" }}
-            transition={{
-              duration: animDuration,
-              repeat: playState,
-              ease: "linear",
-              repeatDelay: visualState === "ACTIVE" ? 0.3 : 0
-            }}
-          />
-          {/* Bidirectional secondary stream/dot */}
-          {isBidirectional && (
-            <motion.div
-              className={`absolute w-2 h-2 rounded-full ${animationConfig.effect === 'stream' ? 'w-full h-[2px] opacity-20 origin-right' : 'bg-emerald-400 shadow-[0_0_15px_rgba(52,211,153,1)]'}`}
-              initial={{ left: "100%" }}
-              animate={{ left: "0%" }}
-              transition={{
-                duration: animDuration,
-                repeat: playState,
-                ease: "linear",
-                repeatDelay: visualState === "ACTIVE" ? 0.3 : 0
-              }}
-            />
-          )}
-        </div>
-      )}
-    </div>
-  );
+/** Convert hex color to r, g, b string for use in rgba() */
+function hexToRgb(hex: string): string {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return '16, 185, 129';
+  return `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`;
 }
 

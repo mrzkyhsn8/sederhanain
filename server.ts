@@ -82,7 +82,7 @@ async function startServer() {
       const prompt = `Kamu adalah mesin backend berbasis AI untuk aplikasi bernama "Sederhanain". Ikuti instruksi di bawah ini dengan sangat ketat untuk memproses input dari pengguna.
 
 1. TENTUKAN TASK
-Tugasmu adalah menerima satu kata kunci konsep abstrak, baik di bidang teknologi (IT) maupun non-teknologi seperti sains, biologi, ekonomi, sosiologi, sejarah, dll (misalnya: "WebSockets", "Async vs Sync", "Black Hole", "Inflasi Ekonomi"). Terjemahkan konsep tersebut menjadi satu tema cerita analogi dunia nyata yang utuh, tentukan tata letak visualnya, pilih emoji pendukungnya, dan bagi cerita tersebut menjadi beberapa tahapan simulasi yang terstruktur dalam bentuk JSON.
+Tugasmu adalah menerima satu kata kunci konsep abstrak, baik di bidang teknologi (IT) maupun non-teknologi seperti sains, biologi, ekonomi, sosiologi, sejarah, dll (misalnya: "WebSockets", "Async vs Sync", "Black Hole", "Inflasi Ekonomi"). Terjemahkan konsep tersebut menjadi satu tema cerita analogi dunia nyata yang utuh, tentukan tata letak visualnya, buatkan SVG storytelling untuk setiap entitas di setiap langkah, dan bagi cerita tersebut menjadi beberapa tahapan simulasi yang terstruktur dalam bentuk JSON.
 
 2. BERI CONTEXT
 Hasil JSON darimu akan dibaca oleh aplikasi Frontend (React + Tailwind) untuk merender komponen visual secara dinamis (Generative UI). 
@@ -90,10 +90,27 @@ Hasil JSON darimu akan dibaca oleh aplikasi Frontend (React + Tailwind) untuk me
   1. "PIPELINE" (Alur horizontal kiri-kanan, cocok untuk proses mengalir/timbal balik).
   2. "SPLIT_LANES" (Alur vertikal atas-bawah, cocok untuk perbandingan paralel/balapan/simultan).
   3. "HUB_AND_SPOKE" (Satu pusat di tengah dikelilingi banyak cabang).
-- Setiap entitas harus memiliki peran yang jelas agar tidak tumpang tindih secara logika di panggung visual. Gunakan Emoji (visualAsset) sebagai avatar unik untuk tiap entitas.
+- Setiap entitas harus memiliki peran yang jelas agar tidak tumpang tindih secara logika di panggung visual. Gunakan Emoji (visualAsset) sebagai avatar fallback unik untuk tiap entitas.
 - Kami memisahkan dengan ketat antara apa yang dilihat manusia (tampilan UI) dan apa yang dibaca oleh kode robot Frontend (untuk animasi CSS).
 
-3. BERI EXAMPLE
+3. ATURAN SVG STORYTELLING (WAJIB)
+Setiap entitas HARUS memiliki properti "stepVisuals" yang berisi array objek (satu per simulationStep). Setiap objek berisi:
+- "svgContent": String berisi elemen SVG mentah (TANPA tag <svg> pembungkus). Gunakan primitif: <path>, <rect>, <circle>, <line>, <polygon>, <ellipse>. ViewBox yang dipakai frontend adalah "0 0 64 64", jadi semua koordinat harus dalam rentang 0-64.
+- "primaryColor": Warna hex utama untuk stroke/fill. WAJIB mengikuti pola progresi warna per langkah:
+  * Langkah 1 (SETUP): Hijau "#10b981"
+  * Langkah 2 (PROCESSING): Kuning/Amber "#f59e0b"
+  * Langkah 3 (ACTIVE): Merah "#ef4444"
+  * Langkah 4 (BROKEN): Abu-abu/Rose "#71717a" atau "#e11d48"
+
+ATURAN KRITIS SVG:
+- SVG harus BERMUTASI di setiap langkah — bentuk, path, fill, opacity, dan warna harus berubah untuk menceritakan evolusi visual entitas.
+- Contoh mutasi: Objek utuh → mulai retak → rusak parah → hancur/hilang. Atau: Kosong → terisi sebagian → penuh → meluap/pecah.
+- Gunakan strokeWidth="2" atau "2.5" untuk garis utama, strokeLinecap="round" dan strokeLinejoin="round".
+- Jangan gunakan atribut class, style, atau animasi CSS di dalam SVG. Animasi ditangani oleh Frontend.
+- Setiap langkah HARUS menggunakan minimal 3-4 elemen primitif SVG yang dikombinasikan untuk membangun ikon yang kaya cerita dan detail. JANGAN hanya menghasilkan satu bentuk geometris tunggal yang terlalu polos/minimalis. Tambahkan elemen aksen pendukung di sekitar objek utama — seperti garis-garis kecil menyerupai uap, titik-titik partikel, pola gerigi, garis putus untuk efek retakan, atau lingkaran kecil untuk detail mekanis — agar terlihat seperti cetak biru (blueprint) teknologi yang ekspresif. Maksimum 8-10 elemen per langkah.
+- Semua atribut SVG HARUS menggunakan format XML (bukan JSX). Contoh: stroke-width bukan strokeWidth, fill-opacity bukan fillOpacity, stroke-linecap bukan strokeLinecap, stroke-linejoin bukan strokeLinejoin, stroke-dasharray bukan strokeDasharray.
+
+4. BERI EXAMPLE
 Jika pengguna memasukkan input: "Black Hole", maka hasil ideal yang harus kamu kembalikan adalah seperti ini:
 
 {
@@ -107,21 +124,75 @@ Jika pengguna memasukkan input: "Black Hole", maka hasil ideal yang harus kamu k
       "techName": "Matter & Light",
       "analogyName": "Bebek Karet & Air",
       "description": "Objek malang yang berenang terlalu dekat dengan pusaran.",
-      "visualAsset": "🦆"
+      "visualAsset": "🦆",
+      "stepVisuals": [
+        {
+          "svgContent": "<circle cx='32' cy='38' r='12' fill='#10b981' fill-opacity='0.15' stroke='#10b981' stroke-width='2'/><ellipse cx='32' cy='44' rx='8' ry='4' fill='#10b981' fill-opacity='0.1'/><circle cx='28' cy='34' r='1.5' fill='#10b981'/><circle cx='36' cy='34' r='1.5' fill='#10b981'/><path d='M28 40 Q32 44 36 40' stroke='#10b981' stroke-width='2' fill='none' stroke-linecap='round'/>",
+          "primaryColor": "#10b981"
+        },
+        {
+          "svgContent": "<circle cx='32' cy='36' r='11' fill='#f59e0b' fill-opacity='0.1' stroke='#f59e0b' stroke-width='2'/><path d='M26 38 Q32 42 38 38' stroke='#f59e0b' stroke-width='2' fill='none'/><circle cx='28' cy='32' r='1.5' fill='#f59e0b'/><circle cx='36' cy='32' r='1.5' fill='#f59e0b'/><path d='M20 28 Q24 24 28 28' stroke='#f59e0b' stroke-width='1.5' fill='none' stroke-dasharray='3,3'/>",
+          "primaryColor": "#f59e0b"
+        },
+        {
+          "svgContent": "<circle cx='32' cy='34' r='9' fill='#ef4444' fill-opacity='0.15' stroke='#ef4444' stroke-width='2'/><path d='M26 36 L38 36' stroke='#ef4444' stroke-width='2'/><circle cx='28' cy='30' r='1.5' fill='#ef4444'/><circle cx='36' cy='30' r='1.5' fill='#ef4444'/><path d='M22 22 L28 28 M42 22 L36 28' stroke='#ef4444' stroke-width='2' stroke-linecap='round'/>",
+          "primaryColor": "#ef4444"
+        },
+        {
+          "svgContent": "<path d='M26 42 Q32 32 38 42' stroke='#71717a' stroke-width='2' fill='none' stroke-dasharray='4,4'/><circle cx='32' cy='46' r='3' fill='#71717a' fill-opacity='0.3'/><path d='M30 28 Q32 22 34 28' stroke='#71717a' stroke-width='1.5' fill='none' stroke-dasharray='2,3'/>",
+          "primaryColor": "#71717a"
+        }
+      ]
     },
     {
       "id": "ent-2",
       "techName": "Event Horizon",
       "analogyName": "Bibir Pusaran",
       "description": "Batas aman terakhir. Jika melewati titik ini, tidak ada jalan kembali.",
-      "visualAsset": "🌀"
+      "visualAsset": "🌀",
+      "stepVisuals": [
+        {
+          "svgContent": "<circle cx='32' cy='32' r='18' fill='none' stroke='#10b981' stroke-width='2' stroke-dasharray='6,4'/><circle cx='32' cy='32' r='10' fill='none' stroke='#10b981' stroke-width='1.5' stroke-dasharray='4,4'/><circle cx='32' cy='32' r='3' fill='#10b981' fill-opacity='0.3'/>",
+          "primaryColor": "#10b981"
+        },
+        {
+          "svgContent": "<circle cx='32' cy='32' r='18' fill='none' stroke='#f59e0b' stroke-width='2.5'/><circle cx='32' cy='32' r='12' fill='none' stroke='#f59e0b' stroke-width='2' stroke-dasharray='5,3'/><circle cx='32' cy='32' r='5' fill='#f59e0b' fill-opacity='0.2'/><path d='M20 20 Q32 32 44 20' stroke='#f59e0b' stroke-width='1.5' fill='none'/>",
+          "primaryColor": "#f59e0b"
+        },
+        {
+          "svgContent": "<circle cx='32' cy='32' r='20' fill='#ef4444' fill-opacity='0.05' stroke='#ef4444' stroke-width='3'/><circle cx='32' cy='32' r='13' fill='none' stroke='#ef4444' stroke-width='2'/><circle cx='32' cy='32' r='6' fill='#ef4444' fill-opacity='0.3'/><path d='M18 18 Q32 32 46 18 M18 46 Q32 32 46 46' stroke='#ef4444' stroke-width='1.5' fill='none'/>",
+          "primaryColor": "#ef4444"
+        },
+        {
+          "svgContent": "<circle cx='32' cy='32' r='20' fill='#e11d48' fill-opacity='0.05' stroke='#e11d48' stroke-width='2' stroke-dasharray='3,5'/><circle cx='32' cy='32' r='8' fill='#e11d48' fill-opacity='0.4'/><path d='M24 24 L40 40 M40 24 L24 40' stroke='#e11d48' stroke-width='2'/>",
+          "primaryColor": "#e11d48"
+        }
+      ]
     },
     {
       "id": "ent-3",
       "techName": "Singularity",
       "analogyName": "Lubang Tanpa Dasar",
       "description": "Titik inti pembuangan tempat semua materi hancur dan lenyap.",
-      "visualAsset": "🕳️"
+      "visualAsset": "🕳️",
+      "stepVisuals": [
+        {
+          "svgContent": "<circle cx='32' cy='32' r='6' fill='#10b981' fill-opacity='0.1' stroke='#10b981' stroke-width='2'/><circle cx='32' cy='32' r='2' fill='#10b981'/>",
+          "primaryColor": "#10b981"
+        },
+        {
+          "svgContent": "<circle cx='32' cy='32' r='10' fill='#f59e0b' fill-opacity='0.1' stroke='#f59e0b' stroke-width='2'/><circle cx='32' cy='32' r='5' fill='#f59e0b' fill-opacity='0.2' stroke='#f59e0b' stroke-width='1.5'/><circle cx='32' cy='32' r='2' fill='#f59e0b'/>",
+          "primaryColor": "#f59e0b"
+        },
+        {
+          "svgContent": "<circle cx='32' cy='32' r='16' fill='#ef4444' fill-opacity='0.1' stroke='#ef4444' stroke-width='2.5'/><circle cx='32' cy='32' r='8' fill='#ef4444' fill-opacity='0.2' stroke='#ef4444' stroke-width='2'/><circle cx='32' cy='32' r='3' fill='#ef4444'/>",
+          "primaryColor": "#ef4444"
+        },
+        {
+          "svgContent": "<circle cx='32' cy='32' r='20' fill='#e11d48' fill-opacity='0.3' stroke='#e11d48' stroke-width='3'/><circle cx='32' cy='32' r='10' fill='#e11d48' fill-opacity='0.5'/><circle cx='32' cy='32' r='4' fill='#e11d48'/>",
+          "primaryColor": "#e11d48"
+        }
+      ]
     }
   ],
   "simulationSteps": [
@@ -176,11 +247,12 @@ Jika pengguna memasukkan input: "Black Hole", maka hasil ideal yang harus kamu k
   ]
 }
 
-4. ATUR FORMAT
+5. ATUR FORMAT
 - Keluaran HARUS berupa JSON murni yang valid sesuai dengan struktur pada contoh di atas.
 - Jangan berikan kalimat pengantar di awal (seperti "Tentu, ini hasilnya:") atau kalimat penutup di akhir.
 - Seluruh teks penjelasan wajib ditulis menggunakan Bahasa Indonesia yang santai, edukatif, mudah dipahami orang awam, namun tetap akurat secara analogi.
 - Aturan Ketat Properti "title" di dalam "simulationSteps": Tulis judul langkah secara kreatif, fleksibel, puitis, dan natural sesuai konteks cerita (Contoh: "Suasana Kolam yang Tenang", "Terjebak di Pusaran Maut"). DILARANG KERAS memasukkan kata "SETUP", "PROCESSING", "ACTIVE", atau "BROKEN" ke dalam properti "title" ini.
+- Jumlah item dalam "stepVisuals" di setiap entity HARUS SAMA PERSIS dengan jumlah "simulationSteps". Jika ada 4 simulationSteps, maka setiap entity harus punya 4 stepVisuals.
 - Kamu HARUS mematuhi batasan nilai (Enum) berikut untuk kebutuhan mesin Frontend:
   * \`layoutType\` hanya boleh berisi: "PIPELINE", "SPLIT_LANES", atau "HUB_AND_SPOKE".
   * \`visualState\` hanya boleh berisi: "SETUP", "PROCESSING", "ACTIVE", atau "BROKEN".
@@ -215,8 +287,19 @@ Input pengguna yang harus kamu eksekusi saat ini adalah: "${concept}"`;
                     analogyName: { type: Type.STRING },
                     description: { type: Type.STRING },
                     visualAsset: { type: Type.STRING },
+                    stepVisuals: {
+                      type: Type.ARRAY,
+                      items: {
+                        type: Type.OBJECT,
+                        properties: {
+                          svgContent: { type: Type.STRING },
+                          primaryColor: { type: Type.STRING },
+                        },
+                        required: ["svgContent", "primaryColor"],
+                      },
+                    },
                   },
-                  required: ["id", "techName", "analogyName", "description", "visualAsset"],
+                  required: ["id", "techName", "analogyName", "description", "visualAsset", "stepVisuals"],
                 },
               },
               simulationSteps: {
