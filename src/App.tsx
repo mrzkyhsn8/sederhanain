@@ -5,45 +5,29 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Loader2, ChevronRight, ChevronLeft, LogOut, Command, Search, X, AlertOctagon, Sparkles, Lock } from "lucide-react";
+import { Loader2, ChevronRight, ChevronLeft, LogOut, Command, Search, X, AlertOctagon, Sparkles, Lock, History, ArrowRight } from "lucide-react";
 import { useGoogleLogin, googleLogout } from '@react-oauth/google';
 
-interface StepVisual {
-  svgContent: string;
-  primaryColor: string;
+interface Komponen {
+  label: string;
+  analogi: string;
+  svgNormal: string;
+  svgBroken: string;
 }
 
-interface Entity {
-  id: string;
-  techName: string;
-  analogyName: string;
-  description: string;
-  visualAsset: string;
-  stepVisuals?: StepVisual[];
-}
-
-interface AnimationConfig {
-  speed: "none" | "slow" | "fast";
-  direction: "none" | "forward" | "backward" | "bidirectional";
-  effect: "none" | "ping" | "pulse" | "stream" | "spin" | "shake" | "race";
-}
-
-interface SimulationStep {
-  step: number;
-  title: string;
-  techAction: string;
-  analogyAction: string;
-  visualState: "SETUP" | "PROCESSING" | "ACTIVE" | "BROKEN";
-  animationConfig: AnimationConfig;
+interface Langkah {
+  kode: string;
+  judul: string;
+  ibaratnya: string;
+  kenyataannya: string;
+  nodeStates: boolean[];
 }
 
 interface SederhanainData {
-  techConcept: string;
-  analogyTheme: string;
-  overview: string;
-  layoutType: "PIPELINE" | "SPLIT_LANES" | "HUB_AND_SPOKE";
-  entities: Entity[];
-  simulationSteps: SimulationStep[];
+  tema: string;
+  deskripsi: string;
+  komponen: Komponen[];
+  langkah: Langkah[];
 }
 
 interface HistoryItem {
@@ -52,9 +36,353 @@ interface HistoryItem {
   timestamp: number;
 }
 
-function sanitizeTitle(title: string) {
-  return title.replace(/^(SETUP|PROCESSING|ACTIVE|BROKEN):\s*/i, "").trim();
+const STYLE = `
+@keyframes dashMove{to{stroke-dashoffset:-24}}
+.fade-up{animation:fadeUp .35s ease both}
+`;
+if (typeof document !== 'undefined' && !document.querySelector("#sdhn-svg-style")) {
+  const el = document.createElement("style");
+  el.id = "sdhn-svg-style";
+  el.textContent = STYLE;
+  document.head.appendChild(el);
 }
+
+const STEPS = [
+  { color: "#00E87C", glow: "rgba(0,232,124,.22)", bg: "rgba(0,232,124,.06)", badge: "SECURE & STABLE", label: "LANGKAH 01" },
+  { color: "#FFB830", glow: "rgba(255,184,48,.22)", bg: "rgba(255,184,48,.06)", badge: "ALERT: WARNING", label: "LANGKAH 02" },
+  { color: "#FF5733", glow: "rgba(255,87,51,.22)", bg: "rgba(255,87,51,.06)", badge: "CRITICAL", label: "LANGKAH 03" },
+  { color: "#9B1C1C", glow: "rgba(155,28,28,.22)", bg: "rgba(155,28,28,.06)", badge: "SYSTEM FAILURE", label: "LANGKAH 04" },
+];
+
+function SvgNode({ node, active, broken, step, index }: any) {
+  const sc = STEPS[step];
+  const svgContent = broken ? (node.svgBroken || node.svgNormal) : node.svgNormal;
+  const col = active ? sc.color : "#2A2D2A";
+  const glowSize = active ? "0 0 28px" : "none";
+
+  return (
+    <div
+      style={{
+        display: "flex", flexDirection: "column", alignItems: "center", gap: "10px",
+        opacity: active ? 1 : 0.22, transition: "opacity .5s ease",
+      }}
+    >
+      <div style={{ position: "relative", width: "110px", height: "110px" }}>
+        {active && (
+          <div style={{
+            position: "absolute", inset: "-8px", borderRadius: "50%",
+            border: `1px solid ${sc.color}`, opacity: 0,
+            animation: `pulse ${2 + index * 0.4}s ease ${index * 0.3}s infinite`,
+          }} />
+        )}
+        <svg viewBox="0 0 110 110" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
+          <circle cx="55" cy="55" r="52" fill="none" stroke={col} strokeWidth={active ? "1.5" : "0.5"}
+            strokeDasharray={broken && active ? "4 4" : active ? "8 4" : "none"}
+            strokeOpacity={active ? 0.8 : 0.3}
+            style={active ? { animation: "dashMove 2s linear infinite" } : {}}
+          />
+        </svg>
+        <div style={{
+          position: "absolute", inset: "8px", borderRadius: "50%",
+          background: active ? `${sc.color}10` : "#0C0D0C",
+          border: `${active ? "1.5" : "0.5"}px solid ${col}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          boxShadow: active ? `${glowSize} ${sc.glow}, inset 0 0 20px ${sc.color}08` : "none",
+          transition: "all .5s ease", overflow: "hidden",
+        }}>
+          <svg viewBox="0 0 60 60" width="50" height="50" style={{
+            color: col, transition: "color .5s ease",
+            filter: broken && active ? `drop-shadow(0 0 6px ${sc.color}88)` : active ? `drop-shadow(0 0 4px ${sc.color}66)` : "none",
+          }} dangerouslySetInnerHTML={{ __html: svgContent }} />
+        </div>
+      </div>
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "8px", color: active ? sc.color : "#2A2D2A", letterSpacing: "1.5px", marginBottom: "4px", transition: "color .5s" }}>
+          {node.label}
+        </div>
+        <div style={{ fontSize: "13px", fontWeight: "600", color: active ? "#E4E8E4" : "#383B38", transition: "color .5s" }}>
+          {node.analogi}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Connection({ active, broken, step }: any) {
+  const sc = STEPS[step];
+  return (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", paddingBottom: "28px" }}>
+      <svg width="80" height="2">
+        <line x1="0" y1="1" x2="80" y2="1" stroke={active ? sc.color : "#1C1F1C"} strokeWidth="1.5" strokeDasharray={active ? "6 4" : "4 4"} strokeOpacity={active ? 0.85 : 0.3} style={active ? { animation: "dashMove 1.5s linear infinite" } : {}} />
+      </svg>
+    </div>
+  );
+}
+
+function InteractiveLoader({ concept, lang }: { concept: string; lang: "id" | "en" }) {
+  const [currentPhaseIdx, setCurrentPhaseIdx] = useState(0);
+
+  const t = TRANSLATIONS[lang];
+  const phases = t.loadingSteps;
+  const loadingPhases = [
+    { id: "analyze", text: phases[0] },
+    { id: "brainstorm", text: phases[1] },
+    { id: "connect", text: phases[2] },
+    { id: "render", text: phases[3] }
+  ];
+
+  useEffect(() => {
+    const timers = [
+      setTimeout(() => setCurrentPhaseIdx(1), 1800),
+      setTimeout(() => setCurrentPhaseIdx(2), 3800),
+      setTimeout(() => setCurrentPhaseIdx(3), 5500),
+    ];
+    return () => {
+      timers.forEach(clearTimeout);
+    };
+  }, []);
+
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center text-emerald-400 max-w-md mx-auto px-6 py-12">
+      {/* Central Pulsing & Spinning Loader Ring */}
+      <div className="relative flex items-center justify-center mb-10">
+        {/* Glow behind loader */}
+        <div className="absolute w-24 h-24 bg-emerald-500/10 rounded-full blur-xl animate-pulse"></div>
+        {/* Orbit ring */}
+        <div className="absolute w-20 h-20 rounded-full border border-emerald-500/10 animate-[spin_6s_linear_infinite]"></div>
+        <div className="absolute w-20 h-20 rounded-full border-t border-emerald-400 animate-spin"></div>
+        <Loader2 className="w-10 h-10 animate-spin text-emerald-400 z-10" />
+      </div>
+
+      {/* Title */}
+      <h3 className="text-white font-medium text-sm tracking-[0.1em] uppercase mb-1 text-center">
+        {t.assembling}
+      </h3>
+      {concept && (
+        <p className="text-white/40 text-[11px] font-mono mb-8 text-center truncate max-w-xs">
+          {t.topicLabel} <span className="text-emerald-400 font-semibold">{concept}</span>
+        </p>
+      )}
+
+      {/* Progressive Checklist */}
+      <div className="w-full space-y-4 bg-zinc-950/40 border border-white/5 rounded-2xl p-6 backdrop-blur-sm">
+        {loadingPhases.map((phase, idx) => {
+          const isDone = idx < currentPhaseIdx;
+          const isActive = idx === currentPhaseIdx;
+
+          return (
+            <motion.div
+              key={phase.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.1, duration: 0.3 }}
+              className={`flex items-center gap-3 transition-colors duration-300 ${isActive ? "text-emerald-400" : isDone ? "text-emerald-500/70" : "text-white/20"
+                }`}
+            >
+              {/* Checkbox status indicator */}
+              <div className="flex items-center justify-center shrink-0">
+                {isDone ? (
+                  <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 animate-in zoom-in duration-300">
+                    <svg
+                      className="w-3 h-3"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                ) : isActive ? (
+                  <div className="w-5 h-5 rounded-full border border-emerald-400/30 flex items-center justify-center relative">
+                    <div className="absolute inset-0 rounded-full border-t-2 border-emerald-400 animate-spin"></div>
+                    <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div>
+                  </div>
+                ) : (
+                  <div className="w-5 h-5 rounded-full border border-white/10 flex items-center justify-center">
+                    <div className="w-1 h-1 bg-white/10 rounded-full"></div>
+                  </div>
+                )}
+              </div>
+
+              {/* Phase Text */}
+              <span
+                className={`text-xs font-medium tracking-wide transition-all duration-300 ${isActive ? "text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)] font-semibold" : ""
+                  }`}
+              >
+                {phase.text}
+              </span>
+            </motion.div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
+const TRANSLATIONS: Record<string, any> = {
+  id: {
+    assembling: "Merakit Analogi",
+    topicLabel: "Topik:",
+    title: "Bikin Konsep Rumit Jadi",
+    titleHighlight: "Sederhana.",
+    subtitle: "Platform interaktif berbasis Generative UI yang mengubah teori kaku, istilah, hingga fenomena sains menjadi simulasi analogi dunia nyata secara real-time.",
+    placeholder: "Ketik topik: Misal WebSockets...",
+    analysisBtn: "Analisis",
+    popularTopics: "Topik Populer:",
+    historyAlert: "Lihat Riwayat Analisis Anda",
+    loginText: "Masuk",
+    searchHistoryBtn: "CARI RIWAYAT ANDA",
+    searchHistoryHeader: "CARI RIWAYAT",
+    faqTitle: "Pertanyaan yang Sering Muncul 🤔",
+    faqSubtitle: "Mungkin kamu punya salah satu pertanyaan ini.",
+    readyTitle: "Siap Mencerna",
+    readyTitleHighlight: "Konsep Rumit?",
+    readySubtitle: "Berhenti membuang waktu memahami dokumentasi yang membosankan. Biarkan AI kami yang menerjemahkannya ke dalam bahasa manusia untukmu.",
+    readyBtn: "Mulai Coba Gratis 🚀",
+    stepLabel: "LANGKAH",
+    badgeSecure: "AMAN & STABIL",
+    badgeWarning: "PERINGATAN",
+    badgeCritical: "KRITIS",
+    badgeFailure: "KEGAGALAN SISTEM",
+    ibaratnya: "Ibaratnya",
+    kenyataannya: "Kenyataannya",
+    analogyTheme: "Tema Analogi",
+    nextBtn: "Selanjutnya",
+    finishBtn: "Selesai ✓",
+    internalSystem: "SISTEM INTERNAL",
+    activeStateSimulation: "SIMULASI KONDISI AKTIF",
+    backToMain: "Kembali ke Menu Utama",
+    logout: "Logout",
+    historyTitle: "Riwayat Analisis",
+    historyEmpty: "Belum ada riwayat",
+    howTitle: "Bagaimana Sederhanain Bekerja? 🤔",
+    howSubtitle: "Hanya butuh tiga langkah simpel untuk mengubah teks buku yang membosankan menjadi cerita visual yang nempel di otak.",
+    step1Title: "Ketik Topikmu",
+    step1Desc: "Masukkan istilah abstrak apa saja, mulai dari WebSockets, Inflasi, hingga Black Hole.",
+    step2Title: "AI Meracik Analogi",
+    step2Desc: "Mesin Sederhanain menerjemahkan teori kaku menjadi skenario cerita sehari-hari.",
+    step3Title: "Mainkan Simulasi",
+    step3Desc: "Lihat visualisasi interaktif langkah-demi-langkah yang bergerak dinamis di layarmu.",
+    showcaseTitle: "Dari Teori Kaku Menjadi Cerita Seru",
+    showcaseSubtitle: "Bandingkan sendiri bagaimana Sederhanain mengubah bahasa teknis yang membosankan menjadi analogi visual yang mudah dicerna otak.",
+    beforeLabel: "Buku Teks / Wikipedia",
+    beforeTitle: "Definisi WebSockets",
+    beforeText: "\"WebSocket adalah protokol komunikasi komputer, yang menyediakan full-duplex communication channels atas koneksi TCP tunggal. Protokol WebSocket distandarisasi oleh IETF sebagai RFC 6455...\"",
+    afterLabel: "Hasil Sederhanain",
+    afterTitle: "Analogi: Pipa Air 2 Arah",
+    afterText: "\"Bayangkan sebuah pipa air ajaib di mana air bisa mengalir dari dua arah sekaligus tanpa harus menunggu giliran. Tidak perlu cape bertanya 'halo, apakah ada air?' setiap detik (polling). Begitu air siap, ia akan langsung menyembur ke arahmu!\"",
+    intuitiveBadge: "Intuitif",
+    realtimeBadge: "Real-time",
+    footerDesc: "Mengubah konsep abstrak dan teori yang rumit menjadi analogi interaktif yang menyenangkan. Belajar tidak pernah se-intuitif ini.",
+    aboutUs: "Tentang Kami",
+    githubRepo: "GitHub Repository",
+    privacyPolicy: "Privacy Policy",
+    aiDisclaimerTitle: "AI Disclaimer 🤖",
+    aiDisclaimerText: "Platform ini ditenagai oleh Generative AI. Analogi yang dihasilkan mungkin tidak 100% akurat secara teknis atau saintifik. Gunakan aplikasi ini sebagai jembatan pemahaman awal, bukan sumber kebenaran mutlak.",
+    loadingSteps: [
+      "Menganalisis topik...",
+      "Merancang analogi yang sesuai...",
+      "Menghubungkan komponen sistem...",
+      "Menyiapkan visualisasi simulasi..."
+    ],
+    faq: [
+      {
+        question: "Apakah Sederhanain 100% gratis?",
+        answer: "Ya! Karena ini masih versi Beta eksploratif, kamu bisa menganalisis topik apa saja."
+      },
+      {
+        question: "Teknologi apa yang ada di baliknya?",
+        answer: "Kami mengandalkan kombinasi ajaib dari Google Gemini API (untuk bernalar dan meracik analogi), serta React & Tailwind untuk merender UI yang interaktif (Generative UI) secara instan."
+      },
+      {
+        question: "Topik apa yang pas dicoba?",
+        answer: "Bebas! Cobalah memasukkan kata kunci bidang IT (seperti Docker, Kubernetes, React Effect), Teori Fisika (Relativitas, Kucing Schrödinger), sampai istilah Finansial (Inflasi, Deflasi, Reksadana)."
+      }
+    ]
+  },
+  en: {
+    assembling: "Assembling Analogy",
+    topicLabel: "Topic:",
+    title: "Make Complex Concepts",
+    titleHighlight: "Simple.",
+    subtitle: "An interactive Generative UI platform that transforms rigid theories, terminology, and scientific phenomena into real-world analogical simulations in real-time.",
+    placeholder: "Type a topic: e.g. WebSockets...",
+    analysisBtn: "Analyze",
+    popularTopics: "Popular Topics:",
+    historyAlert: "View Your Analysis History",
+    loginText: "Login",
+    searchHistoryBtn: "SEARCH YOUR HISTORY",
+    searchHistoryHeader: "SEARCH HISTORY",
+    faqTitle: "Frequently Asked Questions 🤔",
+    faqSubtitle: "You might have one of these questions in mind.",
+    readyTitle: "Ready to Digest",
+    readyTitleHighlight: "Complex Concepts?",
+    readySubtitle: "Stop wasting time on boring documentation. Let our AI translate it into human language for you.",
+    readyBtn: "Start Free Trial 🚀",
+    stepLabel: "STEP",
+    badgeSecure: "SECURE & STABLE",
+    badgeWarning: "ALERT: WARNING",
+    badgeCritical: "CRITICAL",
+    badgeFailure: "SYSTEM FAILURE",
+    ibaratnya: "Analogy",
+    kenyataannya: "Reality",
+    analogyTheme: "Analogy Theme",
+    nextBtn: "Next",
+    finishBtn: "Finish ✓",
+    internalSystem: "INTERNAL SYSTEM",
+    activeStateSimulation: "ACTIVE STATE SIMULATION",
+    backToMain: "Back to Main Screen",
+    logout: "Logout",
+    historyTitle: "Analysis History",
+    historyEmpty: "No history yet",
+    howTitle: "How Sederhanain Works? 🤔",
+    howSubtitle: "It only takes three simple steps to transform boring textbook definitions into a visual story that sticks in your mind.",
+    step1Title: "Type Your Topic",
+    step1Desc: "Enter any abstract concept, from WebSockets and Inflation to Black Holes.",
+    step2Title: "AI Crafts Analogy",
+    step2Desc: "The Sederhanain engine translates rigid theories into everyday real-life scenarios.",
+    step3Title: "Play the Simulation",
+    step3Desc: "Watch step-by-step interactive visualizations animate dynamically on your screen.",
+    showcaseTitle: "From Rigid Theory to Exciting Story",
+    showcaseSubtitle: "See for yourself how Sederhanain turns dry technical jargon into highly digestible visual analogies.",
+    beforeLabel: "Textbook / Wikipedia",
+    beforeTitle: "WebSockets Definition",
+    beforeText: "\"WebSocket is a computer communication protocol, providing full-duplex communication channels over a single TCP connection. The WebSocket protocol was standardized by the IETF as RFC 6455...\"",
+    afterLabel: "Sederhanain Result",
+    afterTitle: "Analogy: 2-Way Water Pipe",
+    afterText: "\"Imagine a magical water pipe where water can flow from both directions at the same time without waiting for turns. No need to exhaustingly ask 'hello, is there water?' every second (polling). Once water is ready, it squirts right at you!\"",
+    intuitiveBadge: "Intuitive",
+    realtimeBadge: "Real-time",
+    footerDesc: "Transforming abstract concepts and complex theories into delightful interactive analogies. Learning has never been this intuitive.",
+    aboutUs: "About Us",
+    githubRepo: "GitHub Repository",
+    privacyPolicy: "Privacy Policy",
+    aiDisclaimerTitle: "AI Disclaimer 🤖",
+    aiDisclaimerText: "This platform is powered by Generative AI. The generated analogies might not be 100% technically or scientifically accurate. Use this application as a bridge for initial understanding, not as an absolute source of truth.",
+    loadingSteps: [
+      "Analyzing topic...",
+      "Designing suitable analogy...",
+      "Connecting system components...",
+      "Preparing simulation visualization..."
+    ],
+    faq: [
+      {
+        question: "Is Sederhanain 100% free?",
+        answer: "Yes! Since this is an exploratory Beta version, you can analyze any topic without search limits."
+      },
+      {
+        question: "What technology is running behind it?",
+        answer: "We rely on the magical combination of Google Gemini API (for outstanding reasoning and crafting analogies), and React & Tailwind to render the interactive UI (Generative UI) instantly."
+      },
+      {
+        question: "What topics are best to try?",
+        answer: "Anything! Try entering keywords in IT (like Docker, Kubernetes, React Effect), Physics Theories (Relativity, Schrödinger's Cat), or Financial terms (Inflation, Deflation, Mutual Funds)."
+      }
+    ]
+  }
+};
 
 export default function App() {
   const [conceptInput, setConceptInput] = useState("");
@@ -66,6 +394,36 @@ export default function App() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [openFaqIdx, setOpenFaqIdx] = useState<number | null>(null);
+  const [lang, setLang] = useState<"id" | "en">(() => {
+    try {
+      const saved = localStorage.getItem("sederhanain_lang");
+      return (saved === "en" || saved === "id") ? saved : "id";
+    } catch {
+      return "id";
+    }
+  });
+
+  const handleLanguageChange = (newLang: "id" | "en") => {
+    setLang(newLang);
+    try {
+      localStorage.setItem("sederhanain_lang", newLang);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const t = TRANSLATIONS[lang];
+
+  const getBadgeText = (idx: number) => {
+    switch (idx) {
+      case 0: return t.badgeSecure;
+      case 1: return t.badgeWarning;
+      case 2: return t.badgeCritical;
+      case 3: return t.badgeFailure;
+      default: return "";
+    }
+  };
   const [history, setHistory] = useState<HistoryItem[]>(() => {
     try {
       const saved = localStorage.getItem("sederhanain_history");
@@ -136,7 +494,7 @@ export default function App() {
       if (e.key === "ArrowLeft") {
         setCurrentStepIdx((prev) => Math.max(0, prev - 1));
       } else if (e.key === "ArrowRight") {
-        setCurrentStepIdx((prev) => Math.min(data.simulationSteps.length - 1, prev + 1));
+        setCurrentStepIdx((prev) => Math.min(data.langkah.length - 1, prev + 1));
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -172,7 +530,7 @@ export default function App() {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${activeToken}`
         },
-        body: JSON.stringify({ concept }),
+        body: JSON.stringify({ concept, lang }),
       });
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -214,7 +572,26 @@ export default function App() {
 
   const filteredHistory = history.filter(item =>
     item.concept.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.data.analogyTheme.toLowerCase().includes(searchQuery.toLowerCase())
+    item.data.tema.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const renderLanguageSwitcher = () => (
+    <div className="flex items-center gap-1 bg-white/5 p-1 rounded-full border border-white/10 shrink-0 select-none">
+      <button
+        type="button"
+        onClick={() => handleLanguageChange("id")}
+        className={`px-2.5 py-1 text-[9px] font-bold rounded-full transition-all cursor-pointer ${lang === "id" ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20 font-black" : "text-zinc-400 hover:text-white"}`}
+      >
+        ID
+      </button>
+      <button
+        type="button"
+        onClick={() => handleLanguageChange("en")}
+        className={`px-2.5 py-1 text-[9px] font-bold rounded-full transition-all cursor-pointer ${lang === "en" ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20 font-black" : "text-zinc-400 hover:text-white"}`}
+      >
+        EN
+      </button>
+    </div>
   );
 
   const renderProfileMenu = () => {
@@ -291,49 +668,68 @@ export default function App() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, transition: { duration: 0 } }}
-            className="h-20 px-8 flex items-center justify-between border-b border-white/10 shrink-0"
+            className="h-20 px-4 sm:px-8 flex items-center justify-between border-b border-white/10 shrink-0"
           >
             <div className="flex items-baseline gap-3">
               <button
                 onClick={() => { setData(null); setIsLoading(false); setConceptInput(''); }}
-                className="text-2xl font-black tracking-tighter uppercase text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+                className="text-lg sm:text-xl md:text-2xl font-black tracking-tighter uppercase text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
               >
                 Sederhanain.
               </button>
               <span className="hidden md:inline text-[10px] uppercase tracking-[0.3em] font-medium text-white/40">AI Concept Visualizer</span>
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2.5 sm:gap-4">
+              {/* History Button (Icon-only, sleek circular layout) */}
               <button
+                type="button"
                 onClick={() => setIsCommandOpen(true)}
-                className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl text-xs font-mono text-emerald-400 font-semibold shadow-lg transition duration-200 cursor-pointer shrink-0"
+                className="flex items-center justify-center w-9 h-9 bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-emerald-400 border border-white/10 hover:border-emerald-500/30 rounded-full shadow-md transition-all duration-200 cursor-pointer shrink-0 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                title={`${t.searchHistoryHeader} (Ctrl + K)`}
               >
-                <Command className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">CARI RIWAYAT</span>
-                <kbd className="hidden md:inline-block px-1.5 py-0.5 text-[9px] bg-black border border-white/10 text-zinc-500 rounded font-bold">
-                  Ctrl + K
-                </kbd>
+                <History className="w-4 h-4" />
               </button>
 
-              <motion.form layoutId="search-form" onSubmit={handleSubmit} className="flex gap-2 w-full max-w-[300px] md:max-w-md hidden md:flex">
-                <motion.input
-                  layoutId="search-input"
-                  type="text"
-                  className="flex-1 bg-white/5 border border-white/10 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-emerald-400 transition-colors placeholder:text-white/40 font-mono"
-                  placeholder="Ketik konsep..."
-                  value={conceptInput}
-                  onChange={(e) => setConceptInput(e.target.value)}
-                />
-                <motion.button
-                  layoutId="search-button"
-                  type="submit"
-                  disabled={isLoading}
-                  className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-4 py-2 rounded-full font-bold uppercase tracking-wider text-[10px] hover:bg-emerald-500/20 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 min-w-[100px]"
-                >
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Analisis"}
-                </motion.button>
+              {/* Integrated Search Bar (Unified Input + Internal Submit Button) */}
+              <motion.form 
+                layoutId="search-form" 
+                onSubmit={handleSubmit} 
+                className="relative items-center w-full max-w-[240px] lg:max-w-[280px] hidden md:flex"
+              >
+                <div className="relative w-full">
+                  <motion.input
+                    layoutId="search-input"
+                    type="text"
+                    className="w-full bg-white/[0.03] hover:bg-white/[0.06] focus:bg-white/[0.08] border border-white/10 focus:border-emerald-500/50 rounded-full pl-9 pr-9 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all placeholder:text-white/30 font-mono"
+                    placeholder={t.placeholder}
+                    value={conceptInput}
+                    onChange={(e) => setConceptInput(e.target.value)}
+                  />
+                  {/* Left Search Icon */}
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
+                  
+                  {/* Embedded Right Action Button */}
+                  <button
+                    type="submit"
+                    disabled={isLoading || !conceptInput.trim()}
+                    className={`absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 focus:outline-none ${
+                      conceptInput.trim() 
+                        ? "bg-emerald-500 text-black hover:bg-emerald-400 cursor-pointer shadow-md shadow-emerald-500/20" 
+                        : "bg-white/5 text-zinc-600 opacity-40 cursor-not-allowed"
+                    }`}
+                    title={t.analysisBtn}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                    )}
+                  </button>
+                </div>
               </motion.form>
 
+              {renderLanguageSwitcher()}
               {renderProfileMenu()}
             </div>
           </motion.header>
@@ -343,12 +739,37 @@ export default function App() {
       <main className={`flex-1 flex flex-col-reverse md:flex-row relative ${data ? "md:h-[calc(100vh-80px)] md:overflow-hidden" : ""}`}>
         {!data && !isLoading && (
           <div className="w-full flex flex-col items-center relative z-10">
-            {/* LOGOUT BUTTON FOR LOGGED IN USERS ON LANDING PAGE */}
-            {token && (
-              <div className="absolute top-6 right-8 z-50">
-                {renderProfileMenu()}
+            {/* LANDING PAGE HEADER */}
+            <div className="absolute top-0 left-0 right-0 h-20 px-4 sm:px-8 flex items-center justify-between z-50">
+              <div className="flex items-baseline gap-3">
+                <span className="text-lg sm:text-xl font-black tracking-tighter uppercase text-emerald-400 select-none">
+                  Sederhanain.
+                </span>
+                <span className="hidden sm:inline text-[9px] uppercase tracking-[0.25em] font-medium text-white/30 select-none">
+                  AI Concept Visualizer
+                </span>
               </div>
-            )}
+              <div className="flex items-center gap-2.5 sm:gap-4">
+                {renderLanguageSwitcher()}
+                {token ? (
+                  renderProfileMenu()
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => login()}
+                    className="flex items-center gap-2 px-5 py-2 rounded-full border border-white/10 hover:border-emerald-500/50 bg-zinc-950/80 hover:bg-emerald-500/5 text-zinc-300 hover:text-emerald-400 text-xs font-bold tracking-wide transition-all duration-300 shadow-md hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] cursor-pointer"
+                  >
+                    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24">
+                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
+                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
+                    </svg>
+                    <span>{t.loginText}</span>
+                  </button>
+                )}
+              </div>
+            </div>
 
             {/* BACKGROUND GRID */}
             <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
@@ -362,16 +783,16 @@ export default function App() {
             </div>
 
             {/* FOLD 1: HERO SECTION */}
-            <div className="min-h-screen flex flex-col items-center justify-center pt-12 pb-24 px-6 w-full relative z-10">
+            <div className="min-h-screen flex flex-col items-center justify-center pt-32 pb-24 px-6 w-full relative z-10">
               <div className="flex flex-col items-center text-center max-w-4xl w-full">
-                <h1 className="text-5xl md:text-7xl font-black tracking-tighter uppercase text-emerald-400 mb-6 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                {/* <h1 className="text-5xl md:text-7xl font-black tracking-tighter uppercase text-emerald-400 mb-6 drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">
                   SEDERHANAIN.
-                </h1>
+                </h1> */}
                 <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-6">
-                  Bikin Konsep Rumit Jadi Sederhana.
+                  {t.title} <span className="text-emerald-400 italic">{t.titleHighlight}</span>
                 </h2>
                 <p className="text-sm md:text-lg text-white/60 max-w-2xl mb-12 leading-relaxed font-medium">
-                  Platform interaktif berbasis Generative UI yang mengubah teori kaku, istilah IT, hingga fenomena sains menjadi simulasi analogi dunia nyata secara real-time.
+                  {t.subtitle}
                 </p>
 
                 <motion.form layoutId="search-form" onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-3 w-full max-w-3xl relative z-10">
@@ -379,8 +800,8 @@ export default function App() {
                     layoutId="search-input"
                     type="text"
                     autoFocus
-                    className="flex-1 bg-white/[0.03] border border-white/10 rounded-full px-8 py-5 text-lg focus:outline-none focus:border-emerald-400 focus:bg-white/[0.05] focus:ring-4 focus:ring-emerald-500/10 transition-all placeholder:text-white/30 font-mono text-center md:text-left shadow-inner"
-                    placeholder="Ketik topik: Misal WebSockets..."
+                    className="flex-1 bg-white/[0.03] border border-white/10 rounded-full px-6 py-3 text-lg focus:outline-none focus:border-emerald-400 focus:bg-white/[0.05] focus:ring-4 focus:ring-emerald-500/10 transition-all placeholder:text-white/30 font-mono text-center md:text-left shadow-inner"
+                    placeholder={t.placeholder}
                     value={conceptInput}
                     onChange={(e) => setConceptInput(e.target.value)}
                   />
@@ -388,9 +809,9 @@ export default function App() {
                     layoutId="search-button"
                     type="submit"
                     disabled={isLoading || !conceptInput.trim()}
-                    className="bg-emerald-500 text-black px-10 py-5 rounded-full font-bold uppercase tracking-widest text-sm hover:bg-emerald-400 transition-all disabled:opacity-50 hover:shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center justify-center gap-2 shrink-0 border border-emerald-400 relative overflow-hidden group min-w-[160px]"
+                    className="bg-emerald-500 text-black px-6 py-3 rounded-full font-bold uppercase tracking-widest text-sm hover:bg-emerald-400 transition-all disabled:opacity-50 hover:shadow-[0_0_20px_rgba(16,185,129,0.4)] flex items-center justify-center gap-2 shrink-0 border border-emerald-400 relative overflow-hidden group min-w-[160px]"
                   >
-                    <span className="relative z-10">Analisis</span>
+                    <span className="relative z-10">{t.analysisBtn}</span>
                     <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
                   </motion.button>
                 </motion.form>
@@ -403,7 +824,7 @@ export default function App() {
                       className="flex items-center gap-2.5 px-4 py-2 bg-zinc-950/60 hover:bg-zinc-900 border border-zinc-900 hover:border-zinc-800 rounded-xl font-mono text-xs text-zinc-600 hover:text-zinc-300 transition-all duration-300 shadow-md animate-in fade-in cursor-pointer"
                     >
                       <Lock className="w-3.5 h-3.5 text-zinc-700 animate-pulse" />
-                      <span>Lihat Riwayat Analisis Anda <strong className="text-emerald-500 font-semibold hover:underline">• Masuk</strong></span>
+                      <span>{t.historyAlert} <strong className="text-emerald-500 font-semibold hover:underline">• {t.loginText}</strong></span>
                     </button>
                   </div>
                 )}
@@ -415,15 +836,15 @@ export default function App() {
                       onClick={() => setIsCommandOpen(true)}
                       className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl text-xs font-mono text-emerald-400 font-semibold shadow-lg transition duration-200 cursor-pointer"
                     >
-                      <Command className="w-3.5 h-3.5" />
-                      <span>CARI RIWAYAT ANDA ({history.length})</span>
+                      <History className="w-3.5 h-3.5" />
+                      <span>{t.searchHistoryBtn} ({history.length})</span>
                     </button>
                   </div>
                 )}
 
                 {/* TOPIK POPULER SECTION */}
                 <div className="mt-14 flex flex-col items-center relative z-10 w-full overflow-hidden">
-                  <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-white/40 mb-4">Topik Populer:</span>
+                  <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-white/40 mb-4">{t.popularTopics}</span>
 
                   {/* Marquee Container with Gradient Mask */}
                   <div className="relative flex flex-col gap-3 w-full max-w-5xl overflow-hidden before:absolute before:left-0 before:top-0 before:bottom-0 before:w-16 before:bg-gradient-to-r before:from-[#050505] before:to-transparent before:z-10 after:absolute after:right-0 after:top-0 after:bottom-0 after:w-16 after:bg-gradient-to-l after:from-[#050505] after:to-transparent after:z-10">
@@ -483,43 +904,43 @@ export default function App() {
             {/* FOLD 2+: CARA KERJA SECTION & OTHERS */}
             <div className="w-full flex flex-col items-center px-6 pb-0 relative z-10">
               <div className="w-full max-w-5xl pt-16 mt-16 mb-12 relative flex flex-col items-center">
-                <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-4 text-center">Bagaimana Sederhanain Bekerja? 🤔</h2>
-                <p className="text-white/50 text-center max-w-xl leading-relaxed">Hanya butuh tiga langkah simpel untuk mengubah teks buku yang membosankan menjadi cerita visual yang nempel di otak.</p>
+                <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-4 text-center">{t.howTitle}</h2>
+                <p className="text-white/50 text-center max-w-xl leading-relaxed">{t.howSubtitle}</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl w-full pb-20 relative z-10">
                 <div className="group bg-gradient-to-b from-emerald-500/[0.02] hover:from-emerald-500/[0.08] to-transparent border border-emerald-500/10 hover:border-emerald-500/30 p-8 rounded-3xl flex flex-col items-center text-center relative overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_15px_40px_-15px_rgba(16,185,129,0.3)] md:pointer-events-auto cursor-default">
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent group-hover:w-2/3 transition-all duration-700 opacity-0 group-hover:opacity-100"></div>
                   <div className="w-14 h-14 bg-white/5 group-hover:bg-emerald-500/10 group-hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] group-hover:ring-1 group-hover:ring-emerald-500/20 rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-inner transition-all duration-500 group-hover:scale-110 group-hover:-translate-y-1">⌨️</div>
-                  <h3 className="font-bold text-lg mb-3 tracking-tight group-hover:text-emerald-400 transition-colors duration-300">Ketik Topikmu</h3>
-                  <p className="text-sm text-white/50 leading-relaxed group-hover:text-white/70 transition-colors duration-300">Masukkan istilah abstrak apa saja, mulai dari WebSockets, Inflasi, hingga Black Hole.</p>
+                  <h3 className="font-bold text-lg mb-3 tracking-tight group-hover:text-emerald-400 transition-colors duration-300">{t.step1Title}</h3>
+                  <p className="text-sm text-white/50 leading-relaxed group-hover:text-white/70 transition-colors duration-300">{t.step1Desc}</p>
                 </div>
                 <div className="group bg-gradient-to-b from-emerald-500/[0.02] hover:from-emerald-500/[0.08] to-transparent border border-emerald-500/10 hover:border-emerald-500/30 p-8 rounded-3xl flex flex-col items-center text-center relative overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_15px_40px_-15px_rgba(16,185,129,0.3)] md:pointer-events-auto cursor-default">
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent group-hover:w-2/3 transition-all duration-700 opacity-0 group-hover:opacity-100"></div>
                   <div className="w-14 h-14 bg-white/5 group-hover:bg-emerald-500/10 group-hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] group-hover:ring-1 group-hover:ring-emerald-500/20 rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-inner transition-all duration-500 group-hover:scale-110 group-hover:-translate-y-1">🧠</div>
-                  <h3 className="font-bold text-lg mb-3 tracking-tight group-hover:text-emerald-400 transition-colors duration-300">AI Meracik Analogi</h3>
-                  <p className="text-sm text-white/50 leading-relaxed group-hover:text-white/70 transition-colors duration-300">Mesin Sederhanain menerjemahkan teori kaku menjadi skenario cerita sehari-hari.</p>
+                  <h3 className="font-bold text-lg mb-3 tracking-tight group-hover:text-emerald-400 transition-colors duration-300">{t.step2Title}</h3>
+                  <p className="text-sm text-white/50 leading-relaxed group-hover:text-white/70 transition-colors duration-300">{t.step2Desc}</p>
                 </div>
                 <div className="group bg-gradient-to-b from-emerald-500/[0.02] hover:from-emerald-500/[0.08] to-transparent border border-emerald-500/10 hover:border-emerald-500/30 p-8 rounded-3xl flex flex-col items-center text-center relative overflow-hidden transition-all duration-500 hover:-translate-y-2 hover:shadow-[0_15px_40px_-15px_rgba(16,185,129,0.3)] md:pointer-events-auto cursor-default">
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 w-0 h-[1px] bg-gradient-to-r from-transparent via-emerald-400 to-transparent group-hover:w-2/3 transition-all duration-700 opacity-0 group-hover:opacity-100"></div>
                   <div className="w-14 h-14 bg-white/5 group-hover:bg-emerald-500/10 group-hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] group-hover:ring-1 group-hover:ring-emerald-500/20 rounded-2xl flex items-center justify-center text-2xl mb-6 shadow-inner transition-all duration-500 group-hover:scale-110 group-hover:-translate-y-1">🚀</div>
-                  <h3 className="font-bold text-lg mb-3 tracking-tight group-hover:text-emerald-400 transition-colors duration-300">Mainkan Simulasi</h3>
-                  <p className="text-sm text-white/50 leading-relaxed group-hover:text-white/70 transition-colors duration-300">Lihat visualisasi interaktif langkah-demi-langkah yang bergerak dinamis di layarmu.</p>
+                  <h3 className="font-bold text-lg mb-3 tracking-tight group-hover:text-emerald-400 transition-colors duration-300">{t.step3Title}</h3>
+                  <p className="text-sm text-white/50 leading-relaxed group-hover:text-white/70 transition-colors duration-300">{t.step3Desc}</p>
                 </div>
               </div>
 
               {/* SEKILAS SHOWCASE SECTION */}
               <div className="w-full max-w-5xl mt-12 mb-32 relative z-10 flex flex-col items-center">
-                <h2 className="text-2xl md:text-4xl font-bold tracking-tight mb-4 text-center">Dari Teori Kaku Menjadi Cerita Seru</h2>
-                <p className="text-white/50 mb-12 text-center max-w-2xl leading-relaxed">Bandingkan sendiri bagaimana Sederhanain mengubah bahasa teknis yang membosankan menjadi analogi visual yang mudah dicerna otak.</p>
+                <h2 className="text-2xl md:text-4xl font-bold tracking-tight mb-4 text-center">{t.showcaseTitle}</h2>
+                <p className="text-white/50 mb-12 text-center max-w-2xl leading-relaxed">{t.showcaseSubtitle}</p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full">
                   {/* Sebelum */}
                   <div className="bg-[#0a0a0a] border border-white/5 p-8 rounded-3xl opacity-80 filter grayscale hover:grayscale-0 transition-all duration-500 group">
-                    <span className="inline-block bg-white/10 text-white/50 text-xs px-3 py-1 rounded-full mb-6 font-mono font-medium">Buku Teks / Wikipedia</span>
-                    <h3 className="text-xl font-bold mb-4 font-serif group-hover:text-white transition-colors">Definisi WebSockets</h3>
+                    <span className="inline-block bg-white/10 text-white/50 text-xs px-3 py-1 rounded-full mb-6 font-mono font-medium">{t.beforeLabel}</span>
+                    <h3 className="text-xl font-bold mb-4 font-serif group-hover:text-white transition-colors">{t.beforeTitle}</h3>
                     <p className="text-sm text-white/40 leading-relaxed font-mono">
-                      "WebSocket adalah protokol komunikasi komputer, yang menyediakan full-duplex communication channels atas koneksi TCP tunggal. Protokol WebSocket distandarisasi oleh IETF sebagai RFC 6455..."
+                      {t.beforeText}
                     </p>
                     <div className="mt-8 flex items-center justify-center text-5xl py-8 opacity-20 group-hover:opacity-50 transition-opacity">😴</div>
                   </div>
@@ -529,21 +950,21 @@ export default function App() {
                     <div className="absolute top-0 right-0 p-6 opacity-10">
                       <span className="text-7xl">🔥</span>
                     </div>
-                    <span className="inline-block bg-emerald-500/20 text-emerald-400 text-xs px-3 py-1 rounded-full mb-6 font-mono font-medium border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]">Hasil Sederhanain</span>
-                    <h3 className="text-xl font-bold mb-4 text-white">Analogi: Pipa Air 2 Arah</h3>
+                    <span className="inline-block bg-emerald-500/20 text-emerald-400 text-xs px-3 py-1 rounded-full mb-6 font-mono font-medium border border-emerald-500/20 shadow-[0_0_10px_rgba(16,185,129,0.2)]">{t.afterLabel}</span>
+                    <h3 className="text-xl font-bold mb-4 text-white">{t.afterTitle}</h3>
                     <p className="text-sm text-white/80 leading-relaxed bg-white/5 p-5 rounded-2xl border border-white/5">
-                      "Bayangkan sebuah <b className="text-emerald-400 font-bold">pipa air ajaib</b> di mana air bisa mengalir dari dua arah sekaligus tanpa harus menunggu giliran. Tidak perlu cape bertanya 'halo, apakah ada air?' setiap detik (polling). Begitu air siap, ia akan langsung menyembur ke arahmu!"
+                      {t.afterText}
                     </p>
                     <div className="mt-8 flex gap-3 text-sm font-medium">
-                      <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-lg flex items-center gap-1"><span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span> Intuitif</span>
-                      <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-lg">Real-time</span>
+                      <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-lg flex items-center gap-1">{t.intuitiveBadge}</span>
+                      <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-lg">{t.realtimeBadge}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* TESTIMONIAL SECTION */}
-              <div className="w-full max-w-5xl mb-32 relative z-10 flex flex-col items-center">
+              {/* <div className="w-full max-w-5xl mb-32 relative z-10 flex flex-col items-center">
                 <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-12 text-center">Telah Membantu Ribuan Otak Mencerna Teori</h2>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
@@ -581,55 +1002,69 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </div> */}
 
               {/* FAQ SECTION */}
               <div className="w-full max-w-3xl mb-32 relative z-10 flex flex-col items-center">
-                <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-3 text-center">Pertanyaan yang Sering Muncul 🤔</h2>
-                <p className="text-white/50 mb-10 text-center text-sm md:text-base">Mungkin kamu punya salah satu pertanyaan ini.</p>
+                <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-3 text-center">{t.faqTitle}</h2>
+                <p className="text-white/50 mb-10 text-center text-sm md:text-base">{t.faqSubtitle}</p>
 
                 <div className="w-full flex flex-col gap-4">
-                  <div className="bg-white/[0.02] border border-white/5 p-6 rounded-2xl group hover:border-emerald-500/20 hover:bg-white/[0.04] transition-all duration-300">
-                    <h3 className="font-bold text-emerald-400 mb-2 flex justify-between items-center">
-                      Apakah Sederhanain 100% gratis?
-                    </h3>
-                    <p className="text-sm text-white/60 leading-relaxed mt-2">Ya! Karena ini masih versi Beta eksploratif, kamu bisa menganalisis topik apa saja tanpa batasan kuota pencarian setiap hari.</p>
-                  </div>
-                  <div className="bg-white/[0.02] border border-white/5 p-6 rounded-2xl group hover:border-emerald-500/20 hover:bg-white/[0.04] transition-all duration-300">
-                    <h3 className="font-bold text-emerald-400 mb-2 flex justify-between items-center">
-                      Teknologi gila apa yang ada di baliknya?
-                    </h3>
-                    <p className="text-sm text-white/60 leading-relaxed mt-2">Kami mengandalkan kombinasi ajaib dari <b>Google Gemini API</b> (untuk bernalar luar biasa dan meracik analogi), serta <b>React & Tailwind</b> untuk merender UI yang interaktif (Generative UI) secara instan.</p>
-                  </div>
-                  <div className="bg-white/[0.02] border border-white/5 p-6 rounded-2xl group hover:border-emerald-500/20 hover:bg-white/[0.04] transition-all duration-300">
-                    <h3 className="font-bold text-emerald-400 mb-2 flex justify-between items-center">
-                      Topik apa yang pas dicoba?
-                    </h3>
-                    <p className="text-sm text-white/60 leading-relaxed mt-2">Bebas! Cobalah memasukkan kata kunci bidang IT (seperti Docker, Kubernetes, React Effect), Teori Fisika (Relativitas, Kucing Schrödinger), sampai istilah Finansial (Inflasi, Deflasi, Reksadana).</p>
-                  </div>
+                  {t.faq.map((item: any, idx: number) => {
+                    const isOpen = openFaqIdx === idx;
+                    return (
+                      <div
+                        key={idx}
+                        className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden group hover:border-emerald-500/20 hover:bg-white/[0.03] transition-all duration-300"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setOpenFaqIdx(isOpen ? null : idx)}
+                          className="w-full text-left p-6 flex justify-between items-center cursor-pointer select-none focus:outline-none"
+                        >
+                          <span className={`font-bold text-sm md:text-base transition-colors duration-300 ${isOpen ? "text-emerald-400" : "text-zinc-200 group-hover:text-emerald-400"}`}>
+                            {item.question}
+                          </span>
+                          <span className={`text-xs ml-4 flex items-center justify-center w-6 h-6 rounded-full bg-white/5 text-zinc-400 group-hover:text-emerald-400 group-hover:bg-emerald-500/10 transition-all duration-300 transform ${isOpen ? "rotate-90 text-emerald-400 bg-emerald-500/10" : ""}`}>
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </span>
+                        </button>
+
+                        <div
+                          className={`grid transition-all duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr] opacity-100 border-t border-white/5" : "grid-rows-[0fr] opacity-0"}`}
+                        >
+                          <div className="overflow-hidden">
+                            <div className="p-6 pt-4 text-xs md:text-sm text-white/60 leading-relaxed font-medium">
+                              {item.answer}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
 
               <div className="w-full shrink-0 relative z-10 mt-auto">
                 {/* CTA SECTION */}
-                <div className="max-w-4xl mx-auto px-6 py-20 md:py-24 flex flex-col items-center text-center">
+                <div className="max-w-4xl mx-auto px-6 py-20 md:py-24 flex flex-col items-center text-center mb-32">
                   <h2 className="text-3xl md:text-5xl font-black tracking-tighter uppercase mb-6">
-                    Siap Mencerna <span className="text-emerald-400">Konsep Rumit?</span>
+                    {t.readyTitle} <span className="text-emerald-400">{t.readyTitleHighlight}</span>
                   </h2>
                   <p className="text-white/60 mb-10 max-w-xl leading-relaxed">
-                    Berhenti membuang waktu memahami dokumentasi yang membosankan. Biarkan AI kami yang menerjemahkannya ke dalam bahasa manusia untukmu.
+                    {t.readySubtitle}
                   </p>
                   <button
                     onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                    className="bg-emerald-500 hover:bg-emerald-400 text-[#050505] px-8 py-4 rounded-full font-bold transition-all hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)]"
+                    className="bg-emerald-500 hover:bg-emerald-400 text-[#050505] px-8 py-4 rounded-full font-bold transition-all hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] cursor-pointer"
                   >
-                    Mulai Coba Gratis 🚀
+                    {t.readyBtn}
                   </button>
                 </div>
 
                 {/* FOOTER */}
-                <footer className="w-full border-t border-white/5 px-6 py-12 md:px-12 relative z-10">
+                <footer className="w-full px-6 py-12 md:px-12 relative z-10">
                   <div className="max-w-7xl mx-auto">
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-12">
                       {/* Brand & Description */}
@@ -638,7 +1073,7 @@ export default function App() {
                           Sederhanain.
                         </span>
                         <p className="text-sm text-white/50 leading-relaxed pr-4">
-                          Mengubah konsep abstrak dan teori yang rumit menjadi analogi interaktif yang menyenangkan. Belajar tidak pernah se-intuitif ini.
+                          {t.footerDesc}
                         </p>
                       </div>
 
@@ -646,15 +1081,15 @@ export default function App() {
                       <div className="col-span-1 md:col-span-8 flex flex-col sm:flex-row gap-10 md:justify-end">
                         <div className="flex flex-col gap-4">
                           <h4 className="text-emerald-400 font-bold mb-1 uppercase tracking-wider text-xs">Quick Links</h4>
-                          <a href="#" className="text-sm text-white/60 hover:text-emerald-400 hover:translate-x-1 transition-all w-fit">Tentang Kami</a>
-                          <a href="#" className="text-sm text-white/60 hover:text-emerald-400 hover:translate-x-1 transition-all w-fit">GitHub Repository</a>
-                          <a href="#" className="text-sm text-white/60 hover:text-emerald-400 hover:translate-x-1 transition-all w-fit">Privacy Policy</a>
+                          <a href="#" className="text-sm text-white/60 hover:text-emerald-400 hover:translate-x-1 transition-all w-fit">{t.aboutUs}</a>
+                          <a href="#" className="text-sm text-white/60 hover:text-emerald-400 hover:translate-x-1 transition-all w-fit">{t.githubRepo}</a>
+                          <a href="#" className="text-sm text-white/60 hover:text-emerald-400 hover:translate-x-1 transition-all w-fit">{t.privacyPolicy}</a>
                         </div>
 
                         <div className="flex flex-col gap-4 max-w-sm">
-                          <h4 className="text-emerald-400 font-bold mb-1 uppercase tracking-wider text-xs">AI Disclaimer 🤖</h4>
+                          <h4 className="text-emerald-400 font-bold mb-1 uppercase tracking-wider text-xs">{t.aiDisclaimerTitle}</h4>
                           <p className="text-xs text-white/40 leading-relaxed bg-white/5 p-4 rounded-xl border border-white/5">
-                            Platform ini ditenagai oleh Generative AI. Analogi yang dihasilkan mungkin tidak 100% akurat secara teknis atau saintifik. Gunakan aplikasi ini sebagai jembatan pemahaman awal, bukan sumber kebenaran mutlak.
+                            {t.aiDisclaimerText}
                           </p>
                         </div>
                       </div>
@@ -673,56 +1108,45 @@ export default function App() {
         )}
 
         {isLoading && (
-          <div className="flex-1 flex flex-col items-center justify-center text-emerald-400">
-            <Loader2 className="w-12 h-12 animate-spin mb-4" />
-            <p className="animate-pulse tracking-[0.2em] text-[11px] uppercase font-bold">Merakit Analogi...</p>
-          </div>
+          <InteractiveLoader concept={conceptInput} lang={lang} />
         )}
+
 
         {data && (
           <>
             <aside className="w-full md:w-[340px] border-r border-white/10 bg-[#0a0a0a]/90 backdrop-blur-md p-6 md:p-8 flex flex-col shrink-0 relative z-20 shadow-2xl md:h-full md:overflow-y-auto md:[&::-webkit-scrollbar]:w-1.5 md:[&::-webkit-scrollbar-track]:bg-transparent md:[&::-webkit-scrollbar-thumb]:bg-white/10 md:[&::-webkit-scrollbar-thumb]:rounded-full md:hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
               <div className="mb-8">
-                <h2 className="text-[11px] uppercase tracking-[0.2em] text-emerald-400 font-bold mb-2">Tema Analogi</h2>
-                <h3 className="text-2xl md:text-3xl font-light leading-tight mb-3">{data.analogyTheme}</h3>
+                <h2 className="text-[11px] uppercase tracking-[0.2em] text-emerald-400 font-bold mb-2">{t.analogyTheme}</h2>
+                <h3 className="text-2xl md:text-3xl font-light leading-tight mb-3">{data.tema}</h3>
                 <p className="text-sm text-white/50 leading-relaxed font-light">
-                  {data.overview}
+                  {data.deskripsi}
                 </p>
               </div>
 
               <div className="space-y-1 mb-6 flex-1 md:overflow-y-visible overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
-                {data.simulationSteps.map((step, idx) => {
+                {data.langkah.map((l, idx) => {
                   const isActive = idx === currentStepIdx;
+                  const isc = STEPS[idx];
                   return (
                     <div
                       key={idx}
                       onClick={() => setCurrentStepIdx(idx)}
-                      className={`relative pl-8 border-l py-2 cursor-pointer transition-all duration-300 group
-                        ${idx <= currentStepIdx ? 'border-emerald-500' : 'border-white/10'}
-                      `}
+                      className={`relative pl-8 border-l py-2 cursor-pointer transition-all duration-300 group`}
+                      style={{ borderLeftColor: isActive ? isc.color : 'rgba(255,255,255,0.1)' }}
                     >
-                      {/* Timeline dot */}
                       {isActive ? (
-                        <div className="absolute -left-[7px] top-2.5 w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
+                        <div className="absolute -left-[7px] top-2.5 w-3 h-3 rounded-full" style={{ background: isc.color, boxShadow: `0 0 10px ${isc.color}` }}></div>
                       ) : (
-                        <div className={`absolute -left-[5px] top-3 w-2 h-2 rounded-full transition-colors duration-300 
-                          ${idx < currentStepIdx ? 'bg-emerald-500/50' : 'bg-white/20 group-hover:bg-white/40'}
-                        `}></div>
+                        <div className={`absolute -left-[5px] top-3 w-2 h-2 rounded-full transition-colors duration-300`} style={{ background: idx < currentStepIdx ? isc.color : 'rgba(255,255,255,0.2)' }}></div>
                       )}
 
-                      {/* Step label */}
-                      <h4 className={`text-[10px] uppercase tracking-widest mb-1 transition-colors duration-300 
-                        ${isActive ? 'text-emerald-400' : 'text-white/40 group-hover:text-white/60'}
-                      `}>Langkah {String(idx + 1).padStart(2, '0')}</h4>
-
-                      {/* Step title — no visualState label */}
-                      <p className={`text-sm transition-all duration-300 
-                        ${isActive ? 'font-bold text-white' : idx < currentStepIdx ? 'font-medium text-white/70' : 'font-medium text-white/40 group-hover:text-white/60'}
-                      `}>
-                        {sanitizeTitle(step.title)}
+                      <h4 className="text-[10px] uppercase tracking-widest mb-1 transition-colors duration-300" style={{ color: isActive ? isc.color : 'rgba(255,255,255,0.4)' }}>
+                        {t.stepLabel} 0{idx + 1} · {l.kode}
+                      </h4>
+                      <p className={`text-sm transition-all duration-300 ${isActive ? 'font-bold text-white' : 'font-medium text-white/60'}`}>
+                        {l.judul}
                       </p>
 
-                      {/* Accordion: inline analogy + tech (only for active step) */}
                       <AnimatePresence initial={false}>
                         {isActive && (
                           <motion.div
@@ -731,21 +1155,19 @@ export default function App() {
                             animate={{ height: "auto", opacity: 1 }}
                             exit={{ height: 0, opacity: 0 }}
                             transition={{ duration: 0.3, ease: "easeOut" }}
-                            className="overflow-hidden"
+                            className="overflow-hidden fade-up"
                           >
-                            <div className="mt-3 flex flex-col gap-3 bg-white/[0.03] border border-white/5 rounded-xl p-4">
-                              {/* Analogy */}
+                            <div className="mt-3 flex flex-col gap-3 rounded-xl p-4" style={{ background: isc.bg, border: `0.5px solid ${isc.color}33` }}>
                               <div>
-                                <span className="text-[9px] uppercase tracking-widest text-emerald-400/70 font-bold block mb-1.5">Ibaratnya:</span>
+                                <span className="text-[9px] uppercase tracking-widest font-bold block mb-1.5" style={{ color: isc.color }}>{t.ibaratnya}:</span>
                                 <p className="text-sm text-white/80 leading-relaxed italic py-0.5 font-serif">
-                                  "{step.analogyAction}"
+                                  "{l.ibaratnya}"
                                 </p>
                               </div>
-                              {/* Reality */}
                               <div>
-                                <span className="text-[9px] uppercase tracking-widest font-bold block mb-1.5 text-amber-500">Kenyataannya:</span>
+                                <span className="text-[9px] uppercase tracking-widest font-bold block mb-1.5 text-amber-500">{t.kenyataannya}:</span>
                                 <p className="text-[11px] text-white/50 leading-relaxed font-mono">
-                                  {step.techAction}
+                                  {l.kenyataannya}
                                 </p>
                               </div>
                             </div>
@@ -757,7 +1179,6 @@ export default function App() {
                 })}
               </div>
 
-              {/* Navigation buttons */}
               <div className="mt-auto flex flex-col gap-3 border-t border-white/10 pt-5">
                 <div className="flex gap-2">
                   <button
@@ -767,13 +1188,13 @@ export default function App() {
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
-                  {currentStepIdx < data.simulationSteps.length - 1 ? (
+                  {currentStepIdx < data.langkah.length - 1 ? (
                     <button
                       onClick={() => setCurrentStepIdx(currentStepIdx + 1)}
                       className="flex-1 rounded-xl bg-emerald-500 text-black py-3.5 flex items-center justify-center gap-2 font-bold uppercase text-xs tracking-widest hover:bg-emerald-400 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] active:scale-[0.98]"
+                      style={{ background: STEPS[currentStepIdx].color }}
                     >
-                      {/* <span>Langkah {currentStepIdx + 2} dari {data.simulationSteps.length}</span> */}
-                      <span>Selanjutnya</span>
+                      <span>{t.nextBtn}</span>
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   ) : (
@@ -781,7 +1202,7 @@ export default function App() {
                       onClick={() => { setData(null); setCurrentStepIdx(0); setConceptInput(''); }}
                       className="flex-1 rounded-xl bg-white/10 text-white py-3.5 flex items-center justify-center gap-2 font-bold uppercase text-xs tracking-widest hover:bg-white/15 transition-all border border-white/10"
                     >
-                      <span>Selesai ✓</span>
+                      <span>{t.finishBtn}</span>
                     </button>
                   )}
                 </div>
@@ -789,43 +1210,33 @@ export default function App() {
             </aside>
 
             <section className="flex-1 relative bg-[radial-gradient(#1a1a1a_1px,transparent_1px)] [background-size:32px_32px] md:h-full md:overflow-y-auto flex flex-col items-center p-6 md:p-8 md:[&::-webkit-scrollbar]:w-1.5 md:[&::-webkit-scrollbar-track]:bg-transparent md:[&::-webkit-scrollbar-thumb]:bg-white/10 md:[&::-webkit-scrollbar-thumb]:rounded-full md:hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
-              {/* Status Header */}
-              <div className="w-full flex justify-between items-center mb-6 z-30 shrink-0">
+              <div className="w-full flex justify-between items-center mb-6 z-30 shrink-0" style={{
+                background: `linear-gradient(90deg, ${STEPS[currentStepIdx].bg} 0%, transparent 50%)`,
+                padding: '10px 20px', borderRadius: '10px',
+                borderLeft: `2px solid ${STEPS[currentStepIdx].color}`,
+                transition: "all .5s"
+              }}>
                 <div className="flex items-center gap-2">
-                  <span className="relative flex h-2 w-2">
-                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${data.simulationSteps[currentStepIdx].visualState === 'BROKEN' ? 'bg-red-400' : 'bg-emerald-400'}`}></span>
-                    <span className={`relative inline-flex rounded-full h-2 w-2 ${data.simulationSteps[currentStepIdx].visualState === 'BROKEN' ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
-                  </span>
-                  <span className="text-[10px] font-mono tracking-widest text-white/40 uppercase">ACTIVE STATE SIMULATION</span>
+                  <div style={{
+                    width: "8px", height: "8px", borderRadius: "50%",
+                    background: STEPS[currentStepIdx].color,
+                    boxShadow: `0 0 8px ${STEPS[currentStepIdx].color}`,
+                    animation: "pulse 2s ease infinite",
+                  }} />
+                  <span className="text-[10px] font-mono tracking-widest text-white/70 uppercase">{t.activeStateSimulation}</span>
                 </div>
-                <div className={`px-3 py-1 border rounded-lg text-xs font-mono font-bold tracking-wider ${data.simulationSteps[currentStepIdx].visualState === 'SETUP'
-                  ? 'text-emerald-400 bg-emerald-950/50 border-emerald-500/30'
-                  : data.simulationSteps[currentStepIdx].visualState === 'PROCESSING'
-                    ? 'text-amber-400 bg-amber-950/50 border-amber-500/30'
-                    : data.simulationSteps[currentStepIdx].visualState === 'ACTIVE'
-                      ? 'text-red-500 bg-red-950/50 border-red-500/30 animate-pulse'
-                      : 'text-rose-600 bg-rose-950/60 border-rose-500/40 border-dashed animate-pulse'
-                  }`}>
-                  {data.simulationSteps[currentStepIdx].visualState === 'SETUP' ? 'SYSTEM READY'
-                    : data.simulationSteps[currentStepIdx].visualState === 'PROCESSING' ? 'WARNING: PROCESSING'
-                      : data.simulationSteps[currentStepIdx].visualState === 'ACTIVE' ? 'CRITICAL: ACTIVE'
-                        : 'DISCONNECTED / FAILURE'}
+                <div className={`px-3 py-1 border rounded-lg text-xs font-mono font-bold tracking-wider transition-all duration-500`} style={{ color: STEPS[currentStepIdx].color, borderColor: STEPS[currentStepIdx].color, background: STEPS[currentStepIdx].bg }}>
+                  {getBadgeText(currentStepIdx)}
                 </div>
               </div>
 
               <div className="w-full flex-1 flex flex-col justify-center items-center my-auto pb-6 md:pb-10 z-10">
-                {/* System Container Box */}
-                <div className={`w-full p-6 rounded-2xl border transition-all duration-500 relative ${data.simulationSteps[currentStepIdx].visualState === 'SETUP'
-                  ? 'bg-zinc-950/40 border-white/10'
-                  : data.simulationSteps[currentStepIdx].visualState === 'PROCESSING'
-                    ? 'bg-amber-950/5 border-amber-950/30'
-                    : data.simulationSteps[currentStepIdx].visualState === 'ACTIVE'
-                      ? 'bg-red-950/5 border-red-950/30'
-                      : 'bg-zinc-950/80 border-rose-950/50 border-dashed'
-                  }`}>
-                  {/* System label watermark */}
-                  <div className="absolute top-2 left-4 text-[9px] font-mono tracking-wider text-white/30 uppercase">
-                    🧠 INTERNAL SYSTEM
+                <div className="w-full p-6 rounded-2xl border transition-all duration-500 relative flex items-center justify-center min-h-[400px]" style={{
+                  background: 'transparent', borderColor: 'rgba(255,255,255,0.05)',
+                  backgroundImage: `radial-gradient(ellipse 60% 60% at 50% 50%, ${STEPS[currentStepIdx].glow} 0%, transparent 70%)`
+                }}>
+                  <div className="absolute top-2 left-4 text-[9px] font-mono tracking-wider text-white/30 uppercase flex items-center gap-2">
+                    <span style={{ color: currentStepIdx === 3 ? "#9B1C1C" : "#1C1F1C" }}>▲</span> {t.internalSystem}
                   </div>
 
                   <AnimatePresence mode="wait">
@@ -835,15 +1246,32 @@ export default function App() {
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 1.05 }}
                       transition={{ duration: 0.4 }}
-                      className="w-full flex justify-center items-center pt-4"
+                      className="w-full flex justify-center items-center pt-4 overflow-x-auto"
                     >
-                      <VisualStage
-                        entities={data.entities}
-                        visualState={data.simulationSteps[currentStepIdx].visualState}
-                        layoutType={data.layoutType}
-                        animationConfig={data.simulationSteps[currentStepIdx].animationConfig}
-                        currentStepIdx={currentStepIdx}
-                      />
+                      <div style={{ display: "flex", alignItems: "center", gap: "0" }}>
+                        {data.komponen?.map((node, i) => {
+                          const ns = data.langkah[currentStepIdx].nodeStates || [true, true, true];
+                          const isBroken = currentStepIdx === 3;
+                          return (
+                            <div key={i} style={{ display: "flex", alignItems: "center" }}>
+                              <SvgNode
+                                node={node}
+                                active={ns[i] !== false}
+                                broken={isBroken}
+                                step={currentStepIdx}
+                                index={i}
+                              />
+                              {i < data.komponen.length - 1 && (
+                                <Connection
+                                  active={ns[i] !== false && ns[i + 1] !== false}
+                                  broken={isBroken}
+                                  step={currentStepIdx}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </motion.div>
                   </AnimatePresence>
                 </div>
@@ -894,7 +1322,7 @@ export default function App() {
                 {filteredHistory.length > 0 ? (
                   <div className="space-y-1">
                     {filteredHistory.map((item, idx) => {
-                      const isActiveTopic = data && item.concept.toLowerCase() === data.techConcept.toLowerCase();
+                      const isActiveTopic = data && item.concept.toLowerCase() === conceptInput.toLowerCase();
                       return (
                         <button
                           key={idx}
@@ -921,7 +1349,7 @@ export default function App() {
                             </div>
                             <div>
                               <span className="font-mono text-xs font-bold block">{item.concept}</span>
-                              <span className="text-[10px] text-zinc-500 block group-hover:text-zinc-400">{item.data.analogyTheme}</span>
+                              <span className="text-[10px] text-zinc-500 block group-hover:text-zinc-400">{item.data.tema}</span>
                             </div>
                           </div>
 
@@ -964,168 +1392,5 @@ export default function App() {
       )}
     </div>
   );
-}
-
-function VisualStage({
-  entities,
-  visualState,
-  layoutType,
-  animationConfig,
-  currentStepIdx
-}: {
-  entities: Entity[],
-  visualState: "SETUP" | "PROCESSING" | "ACTIVE" | "BROKEN",
-  layoutType: "PIPELINE" | "SPLIT_LANES" | "HUB_AND_SPOKE",
-  animationConfig: AnimationConfig,
-  currentStepIdx: number
-}) {
-  const isVertical = layoutType === "SPLIT_LANES";
-  let layoutClasses = "flex-row items-center justify-center";
-  if (isVertical) {
-    layoutClasses = "flex-col items-center justify-center";
-  } else if (layoutType === "HUB_AND_SPOKE") {
-    layoutClasses = "flex-row items-center justify-center flex-wrap gap-y-8";
-  }
-
-  // Connection styling based on visual state
-  const strokeColor =
-    visualState === 'SETUP' ? '#10b981' :
-      visualState === 'PROCESSING' ? '#f59e0b' :
-        visualState === 'ACTIVE' ? '#ef4444' : '#52525b';
-  const flowClass =
-    visualState === 'SETUP' ? 'conduit-flow-active' :
-      visualState === 'PROCESSING' ? 'conduit-flow-stress' :
-        visualState === 'ACTIVE' ? 'conduit-flow-critical' : '';
-  const labelText =
-    visualState === 'BROKEN' ? 'TERPUTUS' :
-      animationConfig.direction === 'forward' ? 'Mengalir Ke' :
-        animationConfig.direction === 'backward' ? 'Dikembalikan' :
-          animationConfig.direction === 'bidirectional' ? 'Saling Terhubung' : 'Terhubung';
-  const isBroken = visualState === 'BROKEN';
-
-  return (
-    <div className={`relative w-full min-h-[400px] flex ${layoutClasses} z-10 px-4 md:px-12 py-12 gap-10 max-[640px]:scale-[0.6] max-[640px]:flex-nowrap origin-center transition-transform duration-300`}>
-
-      {entities.flatMap((ent, idx) => {
-        const isAnimatedNode = visualState === "PROCESSING" || visualState === "ACTIVE";
-        const stepVisual = ent.stepVisuals?.[currentStepIdx];
-        const hasSvg = stepVisual?.svgContent;
-        const primaryColor = stepVisual?.primaryColor || (visualState === 'BROKEN' ? '#e11d48' : '#10b981');
-
-        // Dynamic border/glow colors based on stepVisual primaryColor
-        const borderColor = hasSvg ? primaryColor : (visualState === 'BROKEN' ? '#ef4444' : '#10b981');
-        const glowOpacity = visualState === 'ACTIVE' ? '0.4' : visualState === 'PROCESSING' ? '0.25' : '0.15';
-
-        const items: React.ReactNode[] = [];
-
-        items.push(
-          <motion.div
-            key={ent.id}
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{
-              scale: visualState === "BROKEN" ? [1, 1.1, 0.9, 1] : (isAnimatedNode && animationConfig.effect === "pulse" ? [1, 1.1, 1] : 1),
-              rotate: isAnimatedNode && animationConfig.effect === "spin" ? 360 : 0,
-              x: isAnimatedNode && animationConfig.effect === "shake" ? [0, -5, 5, -5, 5, 0] : 0,
-              opacity: 1
-            }}
-            transition={{
-              duration: animationConfig.speed === "fast" ? 0.2 : (animationConfig.speed === "slow" ? 1.5 : 0.5),
-              delay: idx * 0.1,
-              repeat: isAnimatedNode && ["pulse", "spin", "shake"].includes(animationConfig.effect) ? Infinity : 0
-            }}
-            className="relative flex flex-col items-center z-20 w-32 md:w-40 text-center"
-          >
-            <div
-              className={`w-20 h-20 md:w-24 md:h-24 shrink-0 rounded-full border-4 flex items-center justify-center bg-[#050505] transition-all duration-500 ${visualState === 'BROKEN' ? 'border-dashed' : ''
-                } ${visualState === 'ACTIVE' ? 'animate-pulse' : ''}`}
-              style={{
-                borderColor: borderColor,
-                boxShadow: `0 0 15px rgba(${hexToRgb(borderColor)}, ${glowOpacity})`,
-              }}
-            >
-              {hasSvg ? (
-                /* Render AI-generated SVG content */
-                <svg
-                  className="w-12 h-12 md:w-14 md:h-14 transition-all duration-500"
-                  viewBox="0 0 64 64"
-                  fill="none"
-                  dangerouslySetInnerHTML={{ __html: stepVisual!.svgContent }}
-                />
-              ) : (
-                /* Emoji fallback for backwards compatibility */
-                <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-xl md:text-2xl ${visualState === 'BROKEN' ? 'bg-red-500/20' : 'bg-emerald-500/20'}`}>
-                  {ent.visualAsset || <div className={`w-3 h-3 md:w-4 md:h-4 rounded-full ${visualState === 'BROKEN' ? 'bg-red-500 shadow-[0_0_10px_#ef4444]' : 'bg-emerald-500 shadow-[0_0_10px_#10b981]'}`}></div>}
-                </div>
-              )}
-            </div>
-            <div className="mt-4 flex flex-col items-center gap-1.5 w-full bg-[#050505]/60 p-2 rounded-xl backdrop-blur-sm border border-white/5">
-              <span className="text-[9px] md:text-[10px] font-mono tracking-widest text-white/40 uppercase px-2 py-0.5 rounded shadow whitespace-normal break-words max-w-full leading-tight">{ent.techName}</span>
-              <span className="text-xs md:text-sm font-medium text-white text-center whitespace-normal break-words max-w-full leading-snug">{ent.analogyName}</span>
-            </div>
-          </motion.div>
-        );
-
-        // Connection segment between entities (inline, node-to-node)
-        if (idx < entities.length - 1) {
-          items.push(
-            <div
-              key={`conn-${idx}`}
-              className={`flex items-center justify-center relative z-10 ${isVertical
-                ? 'h-14 w-full flex-col'
-                : 'flex-1 min-w-[40px] max-w-[100px] self-center'
-                }`}
-            >
-              {isBroken ? (
-                <svg
-                  className={isVertical ? 'h-full w-6' : 'w-full h-6'}
-                  viewBox={isVertical ? '0 0 20 60' : '0 0 100 20'}
-                  fill="none"
-                >
-                  {isVertical ? (
-                    <>
-                      <line x1="10" y1="2" x2="10" y2="24" stroke="#52525b" strokeWidth="3" strokeDasharray="4 6" />
-                      <line x1="10" y1="36" x2="10" y2="58" stroke="#52525b" strokeWidth="3" strokeDasharray="4 6" />
-                    </>
-                  ) : (
-                    <>
-                      <line x1="2" y1="10" x2="42" y2="10" stroke="#52525b" strokeWidth="3" strokeDasharray="4 6" />
-                      <line x1="58" y1="10" x2="98" y2="10" stroke="#52525b" strokeWidth="3" strokeDasharray="4 6" />
-                    </>
-                  )}
-                </svg>
-              ) : (
-                <svg
-                  className={isVertical ? 'h-full w-6' : 'w-full h-6'}
-                  viewBox={isVertical ? '0 0 20 60' : '0 0 100 20'}
-                  fill="none"
-                  style={{ filter: `drop-shadow(0 0 6px ${strokeColor}40)` }}
-                >
-                  {isVertical ? (
-                    <line x1="10" y1="2" x2="10" y2="58" stroke={strokeColor} strokeWidth="3" strokeDasharray="8, 6" className={flowClass} />
-                  ) : (
-                    <line x1="2" y1="10" x2="98" y2="10" stroke={strokeColor} strokeWidth="3" strokeDasharray="8, 6" className={flowClass} />
-                  )}
-                </svg>
-              )}
-              {/* Relational label at midpoint */}
-              <span className={`absolute ${isVertical ? 'left-8' : '-bottom-5'} px-2 py-0.5 rounded text-[8px] font-mono font-bold tracking-tight uppercase whitespace-nowrap border bg-zinc-950 z-30 ${isBroken ? 'border-red-500/30 text-red-500/60' : 'border-white/10 text-white/40'
-                }`}>
-                {labelText}
-              </span>
-            </div>
-          );
-        }
-
-        return items;
-      })}
-    </div>
-  );
-}
-
-/** Convert hex color to r, g, b string for use in rgba() */
-function hexToRgb(hex: string): string {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) return '16, 185, 129';
-  return `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`;
 }
 
