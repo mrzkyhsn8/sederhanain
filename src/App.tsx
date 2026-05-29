@@ -51,20 +51,23 @@ const STEPS = [
   { color: "#00E87C", glow: "rgba(0,232,124,.22)", bg: "rgba(0,232,124,.06)", badge: "SECURE & STABLE", label: "LANGKAH 01" },
   { color: "#FFB830", glow: "rgba(255,184,48,.22)", bg: "rgba(255,184,48,.06)", badge: "ALERT: WARNING", label: "LANGKAH 02" },
   { color: "#FF5733", glow: "rgba(255,87,51,.22)", bg: "rgba(255,87,51,.06)", badge: "CRITICAL", label: "LANGKAH 03" },
-  { color: "#9B1C1C", glow: "rgba(155,28,28,.22)", bg: "rgba(155,28,28,.06)", badge: "SYSTEM FAILURE", label: "LANGKAH 04" },
+  { color: "#FF4D4D", glow: "rgba(255,77,77,.35)", bg: "rgba(255,77,77,.08)", badge: "SYSTEM FAILURE", label: "LANGKAH 04" },
 ];
 
 function SvgNode({ node, active, broken, step, index }: any) {
   const sc = STEPS[step];
   const svgContent = broken ? (node.svgBroken || node.svgNormal) : node.svgNormal;
-  const col = active ? sc.color : "#2A2D2A";
-  const glowSize = active ? "0 0 28px" : "none";
+  
+  // Enhanced design choices for high-contrast broken system failure state:
+  const col = active ? sc.color : (broken ? "#EF4444" : "#2A2D2A");
+  const glowSize = active ? "0 0 28px" : (broken ? "0 0 16px" : "none");
+  const glowColor = active ? sc.glow : "rgba(239, 68, 68, 0.25)";
 
   return (
     <div
       style={{
         display: "flex", flexDirection: "column", alignItems: "center", gap: "10px",
-        opacity: active ? 1 : 0.22, transition: "opacity .5s ease",
+        opacity: active ? 1 : (broken ? 0.95 : 0.22), transition: "opacity .5s ease",
       }}
     >
       <div style={{ position: "relative", width: "110px", height: "110px" }}>
@@ -76,31 +79,31 @@ function SvgNode({ node, active, broken, step, index }: any) {
           }} />
         )}
         <svg viewBox="0 0 110 110" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
-          <circle cx="55" cy="55" r="52" fill="none" stroke={col} strokeWidth={active ? "1.5" : "0.5"}
-            strokeDasharray={broken && active ? "4 4" : active ? "8 4" : "none"}
-            strokeOpacity={active ? 0.8 : 0.3}
+          <circle cx="55" cy="55" r="52" fill="none" stroke={col} strokeWidth={active ? "1.5" : (broken ? "1.2" : "0.5")}
+            strokeDasharray={broken ? "4 4" : active ? "8 4" : "none"}
+            strokeOpacity={active ? 0.8 : (broken ? 0.6 : 0.3)}
             style={active ? { animation: "dashMove 2s linear infinite" } : {}}
           />
         </svg>
         <div style={{
           position: "absolute", inset: "8px", borderRadius: "50%",
-          background: active ? `${sc.color}10` : "#0C0D0C",
-          border: `${active ? "1.5" : "0.5"}px solid ${col}`,
+          background: active ? `${sc.color}10` : (broken ? "#150505" : "#0C0D0C"),
+          border: `${active ? "1.5" : (broken ? "1" : "0.5")}px solid ${col}`,
           display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: active ? `${glowSize} ${sc.glow}, inset 0 0 20px ${sc.color}08` : "none",
+          boxShadow: active ? `${glowSize} ${sc.glow}, inset 0 0 20px ${sc.color}08` : (broken ? `${glowSize} ${glowColor}, inset 0 0 16px rgba(239,68,68,0.06)` : "none"),
           transition: "all .5s ease", overflow: "hidden",
         }}>
           <svg viewBox="0 0 60 60" width="50" height="50" style={{
-            color: col, transition: "color .5s ease",
-            filter: broken && active ? `drop-shadow(0 0 6px ${sc.color}88)` : active ? `drop-shadow(0 0 4px ${sc.color}66)` : "none",
+            color: active ? col : (broken ? "#EF4444" : col), transition: "color .5s ease",
+            filter: broken ? `drop-shadow(0 0 6px rgba(239,68,68,0.7))` : active ? `drop-shadow(0 0 4px ${sc.color}66)` : "none",
           }} dangerouslySetInnerHTML={{ __html: svgContent }} />
         </div>
       </div>
       <div style={{ textAlign: "center" }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "8px", color: active ? sc.color : "#2A2D2A", letterSpacing: "1.5px", marginBottom: "4px", transition: "color .5s" }}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "8px", color: active ? sc.color : (broken ? "#EF4444" : "#2A2D2A"), letterSpacing: "1.5px", marginBottom: "4px", transition: "color .5s" }}>
           {node.label}
         </div>
-        <div style={{ fontSize: "13px", fontWeight: "600", color: active ? "#E4E8E4" : "#383B38", transition: "color .5s" }}>
+        <div style={{ fontSize: "13px", fontWeight: "600", color: active ? "#E4E8E4" : (broken ? "#FCA5A5" : "#383B38"), transition: "color .5s" }}>
           {node.analogi}
         </div>
       </div>
@@ -1236,7 +1239,7 @@ export default function App() {
                   backgroundImage: `radial-gradient(ellipse 60% 60% at 50% 50%, ${STEPS[currentStepIdx].glow} 0%, transparent 70%)`
                 }}>
                   <div className="absolute top-2 left-4 text-[9px] font-mono tracking-wider text-white/30 uppercase flex items-center gap-2">
-                    <span style={{ color: currentStepIdx === 3 ? "#9B1C1C" : "#1C1F1C" }}>▲</span> {t.internalSystem}
+                    <span style={{ color: currentStepIdx === 3 ? "#FF4D4D" : "#1C1F1C" }}>▲</span> {t.internalSystem}
                   </div>
 
                   <AnimatePresence mode="wait">
