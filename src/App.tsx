@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Loader2, ChevronRight, ChevronLeft, LogOut, Command, Search, X, AlertOctagon, Sparkles, Lock, History, ArrowRight, Volume2, Play, Pause, Square } from "lucide-react";
+import { Loader2, ChevronRight, ChevronLeft, LogOut, Command, Search, X, AlertOctagon, Sparkles, Lock, History, ArrowRight, Volume2, Play, Pause, Square, Trash2 } from "lucide-react";
 import { useGoogleLogin, googleLogout } from '@react-oauth/google';
 
 interface Komponen {
@@ -755,6 +755,20 @@ export default function App() {
     item.data.tema.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const deleteHistoryItem = (conceptToDelete: string) => {
+    setHistory(prev => {
+      const updated = prev.filter(item => item.concept.toLowerCase() !== conceptToDelete.toLowerCase());
+      try {
+        const sub = userProfile?.sub;
+        const key = sub ? `sederhanain_history_${sub}` : "sederhanain_history";
+        localStorage.setItem(key, JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+      return updated;
+    });
+  };
+
   const renderLanguageSwitcher = () => (
     <div className="flex items-center gap-1 bg-white/5 p-1 rounded-full border border-white/10 shrink-0 select-none">
       <button
@@ -894,8 +908,8 @@ export default function App() {
                     type="submit"
                     disabled={isLoading || !conceptInput.trim()}
                     className={`absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 focus:outline-none ${conceptInput.trim()
-                        ? "bg-emerald-500 text-black hover:bg-emerald-400 cursor-pointer shadow-md shadow-emerald-500/20"
-                        : "bg-white/5 text-zinc-600 opacity-40 cursor-not-allowed"
+                      ? "bg-emerald-500 text-black hover:bg-emerald-400 cursor-pointer shadow-md shadow-emerald-500/20"
+                      : "bg-white/5 text-zinc-600 opacity-40 cursor-not-allowed"
                       }`}
                     title={t.analysisBtn}
                   >
@@ -1362,8 +1376,8 @@ export default function App() {
                                     type="button"
                                     onClick={() => setAutoAdvance(prev => !prev)}
                                     className={`px-2 py-0.5 rounded text-[8px] font-bold font-mono transition-all duration-300 border cursor-pointer ${autoAdvance
-                                        ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                                        : "bg-white/5 border-white/5 text-zinc-500 hover:text-zinc-400"
+                                      ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                                      : "bg-white/5 border-white/5 text-zinc-500 hover:text-zinc-400"
                                       }`}
                                     title={t.audioAutoAdvanceDesc}
                                   >
@@ -1569,44 +1583,65 @@ export default function App() {
                     {filteredHistory.map((item, idx) => {
                       const isActiveTopic = data && item.concept.toLowerCase() === conceptInput.toLowerCase();
                       return (
-                        <button
+                        <div
                           key={idx}
-                          onClick={() => {
-                            setConceptInput(item.concept);
-                            setData(item.data);
-                            setCurrentStepIdx(0);
-                            setIsCommandOpen(false);
-                          }}
-                          className={`w-full text-left p-3 rounded-xl transition duration-150 flex items-center justify-between group cursor-pointer
+                          className={`w-full flex items-center justify-between p-1 rounded-xl transition duration-150 group/item
                             ${isActiveTopic
                               ? 'bg-emerald-950/20 border border-emerald-500/20 text-emerald-400'
                               : 'hover:bg-zinc-900/60 border border-transparent text-zinc-400 hover:text-white'
                             }`}
                         >
-                          <div className="flex items-center gap-3">
-                            <div className={`h-8 w-8 rounded-lg flex items-center justify-center border transition
-                              ${isActiveTopic
-                                ? 'bg-emerald-950 border-emerald-500/30 text-emerald-400'
-                                : 'bg-zinc-900 border-zinc-800 text-zinc-500 group-hover:text-emerald-400 group-hover:border-emerald-500/30'
-                              }`}
-                            >
-                              <Sparkles className="w-4 h-4" />
+                          {/* Main Clickable Area to Select History */}
+                          <div
+                            onClick={() => {
+                              setConceptInput(item.concept);
+                              setData(item.data);
+                              setCurrentStepIdx(0);
+                              setIsCommandOpen(false);
+                            }}
+                            className="flex-1 text-left p-2 flex items-center justify-between cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`h-8 w-8 rounded-lg flex items-center justify-center border transition shrink-0
+                                ${isActiveTopic
+                                  ? 'bg-emerald-950 border-emerald-500/30 text-emerald-400'
+                                  : 'bg-zinc-900 border-zinc-800 text-zinc-500 group-hover:text-emerald-400 group-hover:border-emerald-500/30'
+                                }`}
+                              >
+                                <Sparkles className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <span className="font-mono text-xs font-bold block">{item.concept}</span>
+                                <span className="text-[10px] text-zinc-500 block group-hover:text-zinc-400 truncate max-w-[200px] md:max-w-xs">{item.data.tema}</span>
+                              </div>
                             </div>
-                            <div>
-                              <span className="font-mono text-xs font-bold block">{item.concept}</span>
-                              <span className="text-[10px] text-zinc-500 block group-hover:text-zinc-400">{item.data.tema}</span>
-                            </div>
-                          </div>
 
-                          <div className="flex items-center gap-2">
-                            {isActiveTopic && (
-                              <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30">
-                                AKTIF
-                              </span>
-                            )}
-                            <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-300" />
+
+                            <div className="flex items-center gap-2">
+                              {/* Delete Button */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteHistoryItem(item.concept);
+                                }}
+                                className="p-2 mr-1 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition duration-150 cursor-pointer shrink-0 opacity-0 group-hover/item:opacity-100 focus:opacity-100"
+                                title="Hapus dari riwayat"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+
+                              <div className="flex items-center gap-2">
+                                {isActiveTopic && (
+                                  <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30">
+                                    AKTIF
+                                  </span>
+                                )}
+                                <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-300" />
+                              </div>
+                            </div>
                           </div>
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
