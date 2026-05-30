@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Loader2, ChevronRight, ChevronLeft, LogOut, Command, Search, X, AlertOctagon, Sparkles, Lock, History, ArrowRight } from "lucide-react";
+import { Loader2, ChevronRight, ChevronLeft, LogOut, Command, Search, X, AlertOctagon, Sparkles, Lock, History, ArrowRight, Volume2, Play, Pause, Square, Trash2, Share2, Download, Copy, Check } from "lucide-react";
 import { useGoogleLogin, googleLogout } from '@react-oauth/google';
+import html2canvas from 'html2canvas';
 
 interface Komponen {
   label: string;
@@ -21,6 +22,7 @@ interface Langkah {
   ibaratnya: string;
   kenyataannya: string;
   nodeStates: boolean[];
+  connections: string[];
 }
 
 interface SederhanainData {
@@ -57,9 +59,9 @@ const STEPS = [
 function SvgNode({ node, active, broken, step, index }: any) {
   const sc = STEPS[step];
   const svgContent = broken ? (node.svgBroken || node.svgNormal) : node.svgNormal;
-  
-  // Enhanced design choices for high-contrast broken system failure state:
-  const col = active ? sc.color : (broken ? "#EF4444" : "#2A2D2A");
+
+  // Design choices for active, broken, and beautiful high-contrast inactive standby states:
+  const col = active ? sc.color : (broken ? "#EF4444" : "#4B5563"); // rich slate grey for inactive nodes
   const glowSize = active ? "0 0 28px" : (broken ? "0 0 16px" : "none");
   const glowColor = active ? sc.glow : "rgba(239, 68, 68, 0.25)";
 
@@ -67,7 +69,7 @@ function SvgNode({ node, active, broken, step, index }: any) {
     <div
       style={{
         display: "flex", flexDirection: "column", alignItems: "center", gap: "10px",
-        opacity: active ? 1 : (broken ? 0.95 : 0.22), transition: "opacity .5s ease",
+        opacity: active ? 1 : (broken ? 0.95 : 0.45), transition: "opacity .5s ease",
       }}
     >
       <div style={{ position: "relative", width: "110px", height: "110px" }}>
@@ -79,31 +81,31 @@ function SvgNode({ node, active, broken, step, index }: any) {
           }} />
         )}
         <svg viewBox="0 0 110 110" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
-          <circle cx="55" cy="55" r="52" fill="none" stroke={col} strokeWidth={active ? "1.5" : (broken ? "1.2" : "0.5")}
+          <circle cx="55" cy="55" r="52" fill="none" stroke={col} strokeWidth={active ? "1.5" : (broken ? "1.2" : "0.75")}
             strokeDasharray={broken ? "4 4" : active ? "8 4" : "none"}
-            strokeOpacity={active ? 0.8 : (broken ? 0.6 : 0.3)}
+            strokeOpacity={active ? 0.8 : (broken ? 0.6 : 0.4)}
             style={active ? { animation: "dashMove 2s linear infinite" } : {}}
           />
         </svg>
         <div style={{
           position: "absolute", inset: "8px", borderRadius: "50%",
-          background: active ? `${sc.color}10` : (broken ? "#150505" : "#0C0D0C"),
-          border: `${active ? "1.5" : (broken ? "1" : "0.5")}px solid ${col}`,
+          background: active ? `${sc.color}10` : (broken ? "#150505" : "#0D0E0D"),
+          border: `${active ? "1.5" : (broken ? "1" : "0.75")}px solid ${col}`,
           display: "flex", alignItems: "center", justifyContent: "center",
           boxShadow: active ? `${glowSize} ${sc.glow}, inset 0 0 20px ${sc.color}08` : (broken ? `${glowSize} ${glowColor}, inset 0 0 16px rgba(239,68,68,0.06)` : "none"),
           transition: "all .5s ease", overflow: "hidden",
         }}>
           <svg viewBox="0 0 60 60" width="50" height="50" style={{
-            color: active ? col : (broken ? "#EF4444" : col), transition: "color .5s ease",
+            color: active ? col : (broken ? "#EF4444" : "#4B5563"), transition: "color .5s ease",
             filter: broken ? `drop-shadow(0 0 6px rgba(239,68,68,0.7))` : active ? `drop-shadow(0 0 4px ${sc.color}66)` : "none",
           }} dangerouslySetInnerHTML={{ __html: svgContent }} />
         </div>
       </div>
       <div style={{ textAlign: "center" }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "8px", color: active ? sc.color : (broken ? "#EF4444" : "#2A2D2A"), letterSpacing: "1.5px", marginBottom: "4px", transition: "color .5s" }}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "8px", color: active ? sc.color : (broken ? "#EF4444" : "#4B5563"), letterSpacing: "1.5px", marginBottom: "4px", transition: "color .5s" }}>
           {node.label}
         </div>
-        <div style={{ fontSize: "13px", fontWeight: "600", color: active ? "#E4E8E4" : (broken ? "#FCA5A5" : "#383B38"), transition: "color .5s" }}>
+        <div style={{ fontSize: "13px", fontWeight: "600", color: active ? "#E4E8E4" : (broken ? "#FCA5A5" : "#6B7280"), transition: "color .5s" }}>
           {node.analogi}
         </div>
       </div>
@@ -111,12 +113,57 @@ function SvgNode({ node, active, broken, step, index }: any) {
   );
 }
 
-function Connection({ active, broken, step }: any) {
+function Connection({ active, broken, step, label }: any) {
   const sc = STEPS[step];
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", paddingBottom: "28px" }}>
-      <svg width="80" height="2">
-        <line x1="0" y1="1" x2="80" y2="1" stroke={active ? sc.color : "#1C1F1C"} strokeWidth="1.5" strokeDasharray={active ? "6 4" : "4 4"} strokeOpacity={active ? 0.85 : 0.3} style={active ? { animation: "dashMove 1.5s linear infinite" } : {}} />
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", width: "130px", paddingBottom: "28px" }}>
+      {/* Label Text above the connection line */}
+      {label && (
+        <span style={{
+          position: "absolute",
+          top: "-18px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: "7.5px",
+          fontWeight: "600",
+          color: active ? sc.color : (broken ? "#EF4444" : "#4B5563"),
+          textTransform: "uppercase",
+          letterSpacing: "0.5px",
+          whiteSpace: "nowrap",
+          opacity: active ? 0.9 : 0.5,
+          transition: "color .5s, opacity .5s",
+          pointerEvents: "none",
+          background: "#050505",
+          padding: "2px 6px",
+          borderRadius: "4px",
+          border: `1px dashed ${active ? `${sc.color}30` : (broken ? "rgba(239,68,68,0.15)" : "rgba(75,85,99,0.15)")}`,
+          zIndex: 10,
+        }}>
+          {label}
+        </span>
+      )}
+
+      {/* Line SVG */}
+      <svg width="130" height="4" style={{ overflow: "visible" }}>
+        {/* Glowing backdrop shadow line for active states */}
+        {active && (
+          <line
+            x1="0" y1="2" x2="130" y2="2"
+            stroke={sc.color}
+            strokeWidth="3"
+            strokeOpacity="0.15"
+            style={{ filter: "blur(2px)" }}
+          />
+        )}
+        <line
+          x1="0" y1="2" x2="130" y2="2"
+          stroke={active ? sc.color : (broken ? "#EF4444" : "#2A2D2A")}
+          strokeWidth={active ? "1.5" : (broken ? "1.2" : "0.75")}
+          strokeDasharray={broken ? "4 4" : active ? "6 4" : "4 4"}
+          strokeOpacity={active ? 0.85 : (broken ? 0.6 : 0.3)}
+          style={active ? { animation: "dashMove 1.5s linear infinite" } : {}}
+        />
       </svg>
     </div>
   );
@@ -303,7 +350,20 @@ const TRANSLATIONS: Record<string, any> = {
         question: "Topik apa yang pas dicoba?",
         answer: "Bebas! Cobalah memasukkan kata kunci bidang IT (seperti Docker, Kubernetes, React Effect), Teori Fisika (Relativitas, Kucing Schrödinger), sampai istilah Finansial (Inflasi, Deflasi, Reksadana)."
       }
-    ]
+    ],
+    audioNarrator: "Dengarkan Cerita",
+    audioPlaying: "Membaca Analogi...",
+    audioAutoAdvanceDesc: "Otomatis lanjut ke langkah berikutnya saat selesai membaca",
+    shareBtn: "Bagikan",
+    shareTitle: "Bagikan Analogi",
+    shareToX: "Bagikan ke X",
+    shareToWhatsApp: "Bagikan ke WhatsApp",
+    shareDownloadPNG: "Unduh Gambar",
+    shareCopyClipboard: "Salin Teks",
+    shareCopied: "Tersalin!",
+    shareCardSubtitle: "ANALOGI LENGKAP · 4 LANGKAH",
+    shareCardCta: "Pelajari analogimu sendiri →",
+    shareCardTopic: "Topik"
   },
   en: {
     assembling: "Assembling Analogy",
@@ -383,7 +443,20 @@ const TRANSLATIONS: Record<string, any> = {
         question: "What topics are best to try?",
         answer: "Anything! Try entering keywords in IT (like Docker, Kubernetes, React Effect), Physics Theories (Relativity, Schrödinger's Cat), or Financial terms (Inflation, Deflation, Mutual Funds)."
       }
-    ]
+    ],
+    audioNarrator: "Listen Analogy",
+    audioPlaying: "Reading Analogy...",
+    audioAutoAdvanceDesc: "Automatically advance to the next step when finished reading",
+    shareBtn: "Share",
+    shareTitle: "Share Analogy",
+    shareToX: "Share to X",
+    shareToWhatsApp: "Share to WhatsApp",
+    shareDownloadPNG: "Download Image",
+    shareCopyClipboard: "Copy Text",
+    shareCopied: "Copied!",
+    shareCardSubtitle: "FULL ANALOGY · 4 STEPS",
+    shareCardCta: "Explore your own analogy →",
+    shareCardTopic: "Topic"
   }
 };
 
@@ -415,6 +488,137 @@ export default function App() {
       console.error(e);
     }
   };
+
+  // Audio Storytelling States
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [autoAdvance, setAutoAdvance] = useState(true);
+  const [currentUtterance, setCurrentUtterance] = useState<any>(null);
+
+
+  // Shareable Insights States
+  const [isShareOpen, setIsShareOpen] = useState(false);
+  const [copiedShare, setCopiedShare] = useState(false);
+  const shareCardRef = useRef<HTMLDivElement>(null);
+
+  // Audio Storytelling Helpers
+  const speakStep = (stepIdx: number) => {
+    if (!data) return;
+
+    // 1. Cancel any active speech first
+    window.speechSynthesis.cancel();
+    setIsPlaying(false);
+    setIsPaused(false);
+
+    const l = data.langkah[stepIdx];
+    if (!l) return;
+
+    // 2. Build the spoken narrative text with warm conversational connectors
+    const stepLabel = lang === "en" ? "Step" : "Langkah";
+    const textToSpeak = lang === "en"
+      ? `${stepLabel} ${stepIdx + 1}, ${l.judul}. Imagine it like this: ${l.ibaratnya}. In the real world: ${l.kenyataannya}`
+      : `${stepLabel} ${stepIdx + 1}, ${l.judul}. Ibarat cerita: ${l.ibaratnya}. Dan dalam kenyataan teknologinya: ${l.kenyataannya}`;
+
+    // 3. Initialize utterance
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+
+    // 4. Select optimized highly-natural premium/neural voice
+    const voices = window.speechSynthesis.getVoices();
+    const matchingVoices = voices.filter(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
+
+    let voice = null;
+    if (matchingVoices.length > 0) {
+      // Priority 1: Microsoft Natural Online voices (incredibly realistic Edge voices)
+      const microsoftOnline = matchingVoices.find(v =>
+        v.name.toLowerCase().includes("microsoft") &&
+        (v.name.toLowerCase().includes("natural") || v.name.toLowerCase().includes("online"))
+      );
+
+      // Priority 2: Google Chrome natural voices
+      const googleVoice = matchingVoices.find(v =>
+        v.name.toLowerCase().includes("google")
+      );
+
+      // Priority 3: Apple Safari Siri/Natural voices
+      const naturalVoice = matchingVoices.find(v =>
+        v.name.toLowerCase().includes("natural")
+      );
+
+      // Priority 4: Local offline premium services
+      const localVoice = matchingVoices.find(v => v.localService);
+
+      voice = microsoftOnline || googleVoice || naturalVoice || localVoice || matchingVoices[0];
+    }
+
+    if (voice) {
+      utterance.voice = voice;
+    }
+
+    // Slight speech speed optimization for warm, natural cadence
+    utterance.rate = lang === "id" ? 0.94 : 0.96;
+    utterance.pitch = 1.0;
+
+    // 5. Event bindings
+    utterance.onstart = () => {
+      setIsPlaying(true);
+      setIsPaused(false);
+    };
+
+    utterance.onend = () => {
+      setIsPlaying(false);
+      setIsPaused(false);
+
+      // Auto advance functionality
+      if (autoAdvance && stepIdx < data.langkah.length - 1) {
+        setTimeout(() => {
+          setCurrentStepIdx(prev => {
+            const nextIdx = prev + 1;
+            speakStep(nextIdx);
+            return nextIdx;
+          });
+        }, 1500); // 1.5s peaceful buffer between steps
+      }
+    };
+
+    utterance.onerror = () => {
+      setIsPlaying(false);
+      setIsPaused(false);
+    };
+
+    // 6. Speak!
+    window.speechSynthesis.speak(utterance);
+    setCurrentUtterance(utterance);
+  };
+
+  const pauseSpeech = () => {
+    window.speechSynthesis.pause();
+    setIsPaused(true);
+  };
+
+  const resumeSpeech = () => {
+    window.speechSynthesis.resume();
+    setIsPaused(false);
+  };
+
+  const stopSpeech = () => {
+    window.speechSynthesis.cancel();
+    setIsPlaying(false);
+    setIsPaused(false);
+  };
+
+  // Stop speech if page is unloaded or details change
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, []);
+
+  // Stop speech if they trigger a new search or go back
+  useEffect(() => {
+    window.speechSynthesis.cancel();
+    setIsPlaying(false);
+    setIsPaused(false);
+  }, [data, isLoading]);
 
   const t = TRANSLATIONS[lang];
 
@@ -578,6 +782,20 @@ export default function App() {
     item.data.tema.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const deleteHistoryItem = (conceptToDelete: string) => {
+    setHistory(prev => {
+      const updated = prev.filter(item => item.concept.toLowerCase() !== conceptToDelete.toLowerCase());
+      try {
+        const sub = userProfile?.sub;
+        const key = sub ? `sederhanain_history_${sub}` : "sederhanain_history";
+        localStorage.setItem(key, JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+      return updated;
+    });
+  };
+
   const renderLanguageSwitcher = () => (
     <div className="flex items-center gap-1 bg-white/5 p-1 rounded-full border border-white/10 shrink-0 select-none">
       <button
@@ -695,9 +913,9 @@ export default function App() {
               </button>
 
               {/* Integrated Search Bar (Unified Input + Internal Submit Button) */}
-              <motion.form 
-                layoutId="search-form" 
-                onSubmit={handleSubmit} 
+              <motion.form
+                layoutId="search-form"
+                onSubmit={handleSubmit}
                 className="relative items-center w-full max-w-[240px] lg:max-w-[280px] hidden md:flex"
               >
                 <div className="relative w-full">
@@ -711,16 +929,15 @@ export default function App() {
                   />
                   {/* Left Search Icon */}
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
-                  
+
                   {/* Embedded Right Action Button */}
                   <button
                     type="submit"
                     disabled={isLoading || !conceptInput.trim()}
-                    className={`absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 focus:outline-none ${
-                      conceptInput.trim() 
-                        ? "bg-emerald-500 text-black hover:bg-emerald-400 cursor-pointer shadow-md shadow-emerald-500/20" 
-                        : "bg-white/5 text-zinc-600 opacity-40 cursor-not-allowed"
-                    }`}
+                    className={`absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 focus:outline-none ${conceptInput.trim()
+                      ? "bg-emerald-500 text-black hover:bg-emerald-400 cursor-pointer shadow-md shadow-emerald-500/20"
+                      : "bg-white/5 text-zinc-600 opacity-40 cursor-not-allowed"
+                      }`}
                     title={t.analysisBtn}
                   >
                     {isLoading ? (
@@ -743,7 +960,7 @@ export default function App() {
         {!data && !isLoading && (
           <div className="w-full flex flex-col items-center relative z-10">
             {/* LANDING PAGE HEADER */}
-            <div className="absolute top-0 left-0 right-0 h-20 px-4 sm:px-8 flex items-center justify-between z-50">
+            <div className="absolute top-0 left-0 right-0 h-20 px-4 sm:px-8 flex items-center justify-between z-50 fixed bg-[#050505]">
               <div className="flex items-baseline gap-3">
                 <span className="text-lg sm:text-xl font-black tracking-tighter uppercase text-emerald-400 select-none">
                   Sederhanain.
@@ -1161,6 +1378,71 @@ export default function App() {
                             className="overflow-hidden fade-up"
                           >
                             <div className="mt-3 flex flex-col gap-3 rounded-xl p-4" style={{ background: isc.bg, border: `0.5px solid ${isc.color}33` }}>
+                              {/* Audio Storytelling Controller */}
+                              <div className="flex items-center justify-between border-b border-white/10 pb-2.5 mb-1">
+                                <div className="flex items-center gap-2">
+                                  {isPlaying ? (
+                                    /* Beautiful pulsing audio visualizer waves */
+                                    <div className="flex items-end gap-[1.5px] h-3.5 w-4 pb-0.5">
+                                      <div className="w-[2px] bg-emerald-400 rounded-full animate-pulse" style={{ height: "40%" }} />
+                                      <div className="w-[2px] bg-emerald-400 rounded-full animate-pulse" style={{ height: "100%" }} />
+                                      <div className="w-[2px] bg-emerald-400 rounded-full animate-pulse" style={{ height: "60%" }} />
+                                      <div className="w-[2px] bg-emerald-400 rounded-full animate-pulse" style={{ height: "80%" }} />
+                                    </div>
+                                  ) : (
+                                    <Volume2 className="w-3.5 h-3.5 text-zinc-400" />
+                                  )}
+                                  <span className="text-[9px] uppercase tracking-wider font-mono font-bold text-zinc-400">
+                                    {isPlaying ? t.audioPlaying : t.audioNarrator}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  {/* Auto advance toggle pill */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setAutoAdvance(prev => !prev)}
+                                    className={`px-2 py-0.5 rounded text-[8px] font-bold font-mono transition-all duration-300 border cursor-pointer ${autoAdvance
+                                      ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                                      : "bg-white/5 border-white/5 text-zinc-500 hover:text-zinc-400"
+                                      }`}
+                                    title={t.audioAutoAdvanceDesc}
+                                  >
+                                    AUTO PLAY
+                                  </button>
+
+                                  {/* Play / Pause / Stop buttons */}
+                                  <div className="flex items-center gap-1 bg-black/40 border border-white/5 p-0.5 rounded-lg">
+                                    {isPlaying ? (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => isPaused ? resumeSpeech() : pauseSpeech()}
+                                          className="p-1 text-emerald-400 hover:text-emerald-300 hover:bg-white/5 rounded transition cursor-pointer"
+                                        >
+                                          {isPaused ? <Play className="w-3 h-3 fill-current" /> : <Pause className="w-3 h-3 fill-current" />}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => stopSpeech()}
+                                          className="p-1 text-red-400 hover:text-red-300 hover:bg-white/5 rounded transition cursor-pointer"
+                                        >
+                                          <Square className="w-3 h-3 fill-current" />
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => speakStep(idx)}
+                                        className="p-1 text-emerald-400 hover:text-emerald-300 hover:bg-white/5 rounded transition cursor-pointer"
+                                      >
+                                        <Play className="w-3 h-3 fill-current" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
                               <div>
                                 <span className="text-[9px] uppercase tracking-widest font-bold block mb-1.5" style={{ color: isc.color }}>{t.ibaratnya}:</span>
                                 <p className="text-sm text-white/80 leading-relaxed italic py-0.5 font-serif">
@@ -1213,7 +1495,8 @@ export default function App() {
             </aside>
 
             <section className="flex-1 relative bg-[radial-gradient(#1a1a1a_1px,transparent_1px)] [background-size:32px_32px] md:h-full md:overflow-y-auto flex flex-col items-center p-6 md:p-8 md:[&::-webkit-scrollbar]:w-1.5 md:[&::-webkit-scrollbar-track]:bg-transparent md:[&::-webkit-scrollbar-thumb]:bg-white/10 md:[&::-webkit-scrollbar-thumb]:rounded-full md:hover:[&::-webkit-scrollbar-thumb]:bg-white/20">
-              <div className="w-full flex justify-between items-center mb-6 z-30 shrink-0" style={{
+              {/* Simulation Status Bar */}
+              <div className="w-full flex flex-wrap justify-between items-center mb-4 z-30 shrink-0 gap-2" style={{
                 background: `linear-gradient(90deg, ${STEPS[currentStepIdx].bg} 0%, transparent 50%)`,
                 padding: '10px 20px', borderRadius: '10px',
                 borderLeft: `2px solid ${STEPS[currentStepIdx].color}`,
@@ -1228,13 +1511,26 @@ export default function App() {
                   }} />
                   <span className="text-[10px] font-mono tracking-widest text-white/70 uppercase">{t.activeStateSimulation}</span>
                 </div>
-                <div className={`px-3 py-1 border rounded-lg text-xs font-mono font-bold tracking-wider transition-all duration-500`} style={{ color: STEPS[currentStepIdx].color, borderColor: STEPS[currentStepIdx].color, background: STEPS[currentStepIdx].bg }}>
-                  {getBadgeText(currentStepIdx)}
+                <div className="flex items-center gap-2">
+                  {/* Share Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsShareOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1 border rounded-lg text-[10px] font-mono font-bold tracking-wider transition-all duration-300 cursor-pointer bg-white/5 border-white/10 text-zinc-500 hover:text-emerald-400 hover:border-emerald-500/30 hover:bg-emerald-500/5"
+                    title={t.shareBtn}
+                  >
+                    <Share2 className="w-3 h-3" />
+                    {t.shareBtn.toUpperCase()}
+                  </button>
+                  {/* Badge */}
+                  <div className={`px-3 py-1 border rounded-lg text-xs font-mono font-bold tracking-wider transition-all duration-500`} style={{ color: STEPS[currentStepIdx].color, borderColor: STEPS[currentStepIdx].color, background: STEPS[currentStepIdx].bg }}>
+                    {getBadgeText(currentStepIdx)}
+                  </div>
                 </div>
               </div>
 
               <div className="w-full flex-1 flex flex-col justify-center items-center my-auto pb-6 md:pb-10 z-10">
-                <div className="w-full p-6 rounded-2xl border transition-all duration-500 relative flex items-center justify-center min-h-[400px]" style={{
+                <div className="w-full p-6 rounded-2xl border transition-all duration-500 relative flex flex-col items-center justify-center min-h-[400px]" style={{
                   background: 'transparent', borderColor: 'rgba(255,255,255,0.05)',
                   backgroundImage: `radial-gradient(ellipse 60% 60% at 50% 50%, ${STEPS[currentStepIdx].glow} 0%, transparent 70%)`
                 }}>
@@ -1255,20 +1551,23 @@ export default function App() {
                         {data.komponen?.map((node, i) => {
                           const ns = data.langkah[currentStepIdx].nodeStates || [true, true, true];
                           const isBroken = currentStepIdx === 3;
+                          const isActive = ns[i] !== false;
+
                           return (
                             <div key={i} style={{ display: "flex", alignItems: "center" }}>
                               <SvgNode
                                 node={node}
-                                active={ns[i] !== false}
+                                active={isActive}
                                 broken={isBroken}
                                 step={currentStepIdx}
                                 index={i}
                               />
                               {i < data.komponen.length - 1 && (
                                 <Connection
-                                  active={ns[i] !== false && ns[i + 1] !== false}
+                                  active={isActive && ns[i + 1] !== false}
                                   broken={isBroken}
                                   step={currentStepIdx}
+                                  label={data.langkah[currentStepIdx].connections?.[i]}
                                 />
                               )}
                             </div>
@@ -1327,44 +1626,65 @@ export default function App() {
                     {filteredHistory.map((item, idx) => {
                       const isActiveTopic = data && item.concept.toLowerCase() === conceptInput.toLowerCase();
                       return (
-                        <button
+                        <div
                           key={idx}
-                          onClick={() => {
-                            setConceptInput(item.concept);
-                            setData(item.data);
-                            setCurrentStepIdx(0);
-                            setIsCommandOpen(false);
-                          }}
-                          className={`w-full text-left p-3 rounded-xl transition duration-150 flex items-center justify-between group cursor-pointer
+                          className={`w-full flex items-center justify-between p-1 rounded-xl transition duration-150 group/item
                             ${isActiveTopic
                               ? 'bg-emerald-950/20 border border-emerald-500/20 text-emerald-400'
                               : 'hover:bg-zinc-900/60 border border-transparent text-zinc-400 hover:text-white'
                             }`}
                         >
-                          <div className="flex items-center gap-3">
-                            <div className={`h-8 w-8 rounded-lg flex items-center justify-center border transition
-                              ${isActiveTopic
-                                ? 'bg-emerald-950 border-emerald-500/30 text-emerald-400'
-                                : 'bg-zinc-900 border-zinc-800 text-zinc-500 group-hover:text-emerald-400 group-hover:border-emerald-500/30'
-                              }`}
-                            >
-                              <Sparkles className="w-4 h-4" />
+                          {/* Main Clickable Area to Select History */}
+                          <div
+                            onClick={() => {
+                              setConceptInput(item.concept);
+                              setData(item.data);
+                              setCurrentStepIdx(0);
+                              setIsCommandOpen(false);
+                            }}
+                            className="flex-1 text-left p-2 flex items-center justify-between cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`h-8 w-8 rounded-lg flex items-center justify-center border transition shrink-0
+                                ${isActiveTopic
+                                  ? 'bg-emerald-950 border-emerald-500/30 text-emerald-400'
+                                  : 'bg-zinc-900 border-zinc-800 text-zinc-500 group-hover:text-emerald-400 group-hover:border-emerald-500/30'
+                                }`}
+                              >
+                                <Sparkles className="w-4 h-4" />
+                              </div>
+                              <div>
+                                <span className="font-mono text-xs font-bold block">{item.concept}</span>
+                                <span className="text-[10px] text-zinc-500 block group-hover:text-zinc-400 truncate max-w-[200px] md:max-w-xs">{item.data.tema}</span>
+                              </div>
                             </div>
-                            <div>
-                              <span className="font-mono text-xs font-bold block">{item.concept}</span>
-                              <span className="text-[10px] text-zinc-500 block group-hover:text-zinc-400">{item.data.tema}</span>
-                            </div>
-                          </div>
 
-                          <div className="flex items-center gap-2">
-                            {isActiveTopic && (
-                              <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30">
-                                AKTIF
-                              </span>
-                            )}
-                            <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-300" />
+
+                            <div className="flex items-center gap-2">
+                              {/* Delete Button */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteHistoryItem(item.concept);
+                                }}
+                                className="p-2 mr-1 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition duration-150 cursor-pointer shrink-0 opacity-0 group-hover/item:opacity-100 focus:opacity-100"
+                                title="Hapus dari riwayat"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+
+                              <div className="flex items-center gap-2">
+                                {isActiveTopic && (
+                                  <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30">
+                                    AKTIF
+                                  </span>
+                                )}
+                                <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-300" />
+                              </div>
+                            </div>
                           </div>
-                        </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -1390,6 +1710,249 @@ export default function App() {
 
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* ═══ SHARE MODAL ═══ */}
+      {isShareOpen && data && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 py-8">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-md"
+            onClick={() => { setIsShareOpen(false); setCopiedShare(false); }}
+          />
+
+          {/* Modal Content */}
+          <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-zinc-950 border border-zinc-800/80 shadow-2xl [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800 sticky top-0 bg-zinc-950/95 backdrop-blur-sm z-10">
+              <div className="flex items-center gap-2">
+                <Share2 className="w-4 h-4 text-emerald-400" />
+                <span className="text-sm font-bold text-zinc-100">{t.shareTitle}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setIsShareOpen(false); setCopiedShare(false); }}
+                className="text-zinc-500 hover:text-zinc-300 p-1 cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Share Card Preview (Variant A — Full Story Card) */}
+            <div className="p-4">
+              <div
+                ref={shareCardRef}
+                style={{
+                  width: "100%",
+                  background: "#070908",
+                  border: "0.5px solid #222622",
+                  borderRadius: "14px",
+                  overflow: "hidden",
+                  fontFamily: "'Inter', sans-serif",
+                }}
+              >
+                {/* Top Bar */}
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "12px 16px",
+                  borderBottom: "0.5px solid #1a1e1a",
+                  background: "#080908",
+                }}>
+                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#00e87c", letterSpacing: "1.5px" }}>
+                    SEDERHANAIN.<span style={{ color: "#2a2d2a" }}> AI VISUALIZER</span>
+                  </div>
+                  <div style={{ fontSize: "9px", color: "#2a2d2a", letterSpacing: "1.5px" }}>
+                    {t.shareCardSubtitle}
+                  </div>
+                </div>
+
+                {/* Header: Topic + Tema + Description + Nodes */}
+                <div style={{ padding: "16px 16px 12px", borderBottom: "0.5px solid #1a1e1a" }}>
+                  {/* Searched concept/topic */}
+                  <div style={{
+                    display: "inline-block",
+                    fontSize: "9px", fontWeight: 600, color: "#00e87c",
+                    letterSpacing: "1px", textTransform: "uppercase",
+                    background: "rgba(0,232,124,0.08)",
+                    border: "0.5px solid rgba(0,232,124,0.2)",
+                    borderRadius: "20px",
+                    padding: "2px 10px",
+                    marginBottom: "8px",
+                  }}>
+                    {t.shareCardTopic}: {conceptInput}
+                  </div>
+                  <div style={{ fontSize: "20px", fontWeight: 700, color: "#e4e8e4", marginBottom: "3px", letterSpacing: "-0.3px" }}>
+                    {data.tema}
+                  </div>
+                  <div style={{ fontSize: "11px", color: "#4a4d4a", lineHeight: 1.6 }}>
+                    {data.deskripsi}
+                  </div>
+                  {/* Nodes */}
+                  <div style={{ display: "flex", gap: "6px", marginTop: "10px", flexWrap: "wrap" }}>
+                    {data.komponen?.map((k, idx) => (
+                      <div key={idx} style={{
+                        display: "flex", alignItems: "center", gap: "5px",
+                        background: "#0d100d", border: "0.5px solid #1a1e1a",
+                        borderRadius: "20px", padding: "3px 10px",
+                      }}>
+                        <div style={{
+                          width: "5px", height: "5px", borderRadius: "50%", flexShrink: 0,
+                          background: STEPS[idx]?.color || "#00e87c",
+                        }} />
+                        <span style={{ fontSize: "9px", color: "#4a4d4a", letterSpacing: "0.5px" }}>
+                          {k.label} → {k.analogi}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 4 Steps */}
+                <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 0 }}>
+                  {data.langkah?.map((l, idx) => {
+                    const sc = STEPS[idx];
+                    const stepColors = ["#00e87c", "#ffb830", "#ff5733", "#9b1c1c"];
+                    const c = stepColors[idx] || sc?.color || "#00e87c";
+                    return (
+                      <div key={idx} style={{
+                        display: "flex", gap: "12px", padding: "9px 0",
+                        borderBottom: idx < 3 ? "0.5px solid #111311" : "none",
+                      }}>
+                        {/* Step Color Bar */}
+                        <div style={{
+                          width: "3px", flexShrink: 0, borderRadius: "2px",
+                          alignSelf: "stretch", marginTop: "2px", marginBottom: "2px",
+                          background: c,
+                        }} />
+                        {/* Step Number */}
+                        <div style={{
+                          width: "22px", height: "22px", borderRadius: "5px", flexShrink: 0,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: "10px", fontWeight: 700, marginTop: "1px",
+                          background: `${c}1A`, color: c,
+                        }}>
+                          {idx + 1}
+                        </div>
+                        {/* Step Content */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: "8px", letterSpacing: "1.5px", marginBottom: "2px", color: c }}>
+                            {l.kode} · {lang === "en" ? "STEP" : "LANGKAH"} 0{idx + 1}
+                          </div>
+                          <div style={{
+                            fontSize: "12px", fontWeight: 500, color: "#d4d8d4", marginBottom: "3px",
+                            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                          }}>
+                            {l.judul}
+                          </div>
+                          <div style={{ fontSize: "10px", color: "#4a4d4a", lineHeight: 1.6 }}>
+                            "{l.ibaratnya}"
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Footer */}
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "10px 16px",
+                  borderTop: "0.5px solid #1a1e1a",
+                  background: "#080908",
+                }}>
+                  <div style={{ fontSize: "9px", color: "#2a2d2a", letterSpacing: "0.5px" }}>sederhanain.web.app</div>
+                  <div style={{ fontSize: "9px", color: "#00e87c44", letterSpacing: "1px" }}>{t.shareCardCta}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Share Action Buttons */}
+            <div className="p-4 pt-0 grid grid-cols-2 gap-2">
+              {/* Share to X */}
+              <button
+                type="button"
+                onClick={() => {
+                  const text = `🧠 ${lang === "id" ? "Baru belajar tentang" : "Just learned about"} "${conceptInput}" ${lang === "id" ? "di" : "on"} Sederhanain!\n\n${data.tema}\n${data.deskripsi}\n\n1️⃣ ${data.langkah[0]?.judul}\n2️⃣ ${data.langkah[1]?.judul}\n3️⃣ ${data.langkah[2]?.judul}\n4️⃣ ${data.langkah[3]?.judul}\n\n${lang === "id" ? "Coba sendiri" : "Try it"} → sederhanain.web.app\n#Sederhanain #BelajarMudah`;
+                  window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank');
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white text-xs font-semibold transition-all cursor-pointer"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+                {t.shareToX}
+              </button>
+
+              {/* Share to WhatsApp */}
+              <button
+                type="button"
+                onClick={() => {
+                  const text = `🧠 *${conceptInput}* — ${data.tema}\n\n${data.deskripsi}\n\n1️⃣ ${data.langkah[0]?.judul}\n2️⃣ ${data.langkah[1]?.judul}\n3️⃣ ${data.langkah[2]?.judul}\n4️⃣ ${data.langkah[3]?.judul}\n\n${lang === "id" ? "Coba sendiri" : "Try it"} → sederhanain.web.app`;
+                  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-zinc-900 hover:bg-emerald-950/50 border border-zinc-800 hover:border-emerald-500/30 text-zinc-300 hover:text-emerald-400 text-xs font-semibold transition-all cursor-pointer"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
+                {t.shareToWhatsApp}
+              </button>
+
+              {/* Download PNG */}
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!shareCardRef.current) return;
+                  try {
+                    const canvas = await html2canvas(shareCardRef.current, {
+                      backgroundColor: '#070908',
+                      scale: 2,
+                      useCORS: true,
+                    });
+                    canvas.toBlob((blob) => {
+                      if (!blob) return;
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `sederhanain-${conceptInput.toLowerCase().replace(/\s+/g, '-')}.png`;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                    }, 'image/png');
+                  } catch (err) {
+                    console.error('Failed to capture card:', err);
+                  }
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white text-xs font-semibold transition-all cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                {t.shareDownloadPNG}
+              </button>
+
+              {/* Copy to Clipboard */}
+              <button
+                type="button"
+                onClick={async () => {
+                  const text = `🧠 ${lang === "id" ? "Baru belajar tentang" : "Just learned about"} "${conceptInput}" ${lang === "id" ? "di" : "on"} Sederhanain!\n\n📖 ${data.tema}\n${data.deskripsi}\n\n1️⃣ ${data.langkah[0]?.judul}\n2️⃣ ${data.langkah[1]?.judul}\n3️⃣ ${data.langkah[2]?.judul}\n4️⃣ ${data.langkah[3]?.judul}\n\n🔗 sederhanain.web.app\n#Sederhanain`;
+                  try {
+                    await navigator.clipboard.writeText(text);
+                    setCopiedShare(true);
+                    setTimeout(() => setCopiedShare(false), 2500);
+                  } catch (err) {
+                    console.error('Failed to copy:', err);
+                  }
+                }}
+                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${copiedShare
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                  : "bg-zinc-900 hover:bg-zinc-800 border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white"
+                  }`}
+              >
+                {copiedShare ? (
+                  <><Check className="w-3.5 h-3.5" /> {t.shareCopied}</>
+                ) : (
+                  <><Copy className="w-3.5 h-3.5" /> {t.shareCopyClipboard}</>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
