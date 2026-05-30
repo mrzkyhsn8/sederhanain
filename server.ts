@@ -121,28 +121,32 @@ Hasil JSON darimu harus memiliki format persis seperti ini:
       "judul": "judul langkah 1 (5-7 kata)",
       "ibaratnya": "1-2 kalimat narasi analogi untuk langkah ini",
       "kenyataannya": "1-2 kalimat penjelasan teknis/nyata",
-      "nodeStates": [true, true, true]
+      "nodeStates": [true, true, true],
+      "connections": ["deskripsi aliran komponen 1 ke 2 (max 3 kata)", "deskripsi aliran komponen 2 ke 3 (max 3 kata)"]
     },
     {
       "kode": "PROCESS",
       "judul": "judul langkah 2",
       "ibaratnya": "...",
       "kenyataannya": "...",
-      "nodeStates": [true, true, true]
+      "nodeStates": [true, true, true],
+      "connections": ["...", "..."]
     },
     {
       "kode": "CRITICAL",
       "judul": "judul langkah 3",
       "ibaratnya": "...",
       "kenyataannya": "...",
-      "nodeStates": [true, true, false]
+      "nodeStates": [true, true, false],
+      "connections": ["...", "..."]
     },
     {
       "kode": "BROKEN",
       "judul": "judul langkah 4",
       "ibaratnya": "...",
       "kenyataannya": "...",
-      "nodeStates": [false, false, false]
+      "nodeStates": [false, false, false],
+      "connections": ["koneksi terputus/gagal", "koneksi terputus/gagal"]
     }
   ]
 }
@@ -151,6 +155,7 @@ Hasil JSON darimu harus memiliki format persis seperti ini:
 - Keluaran HARUS berupa JSON murni yang valid.
 - Pastikan ada tepat 4 langkah di dalam array "langkah", dengan kode: "SETUP", "PROCESS", "CRITICAL", dan "BROKEN".
 - "nodeStates" adalah array boolean dengan panjang 3 (karena ada 3 komponen), menandakan apakah komponen tersebut masih aktif (true) atau mati (false) pada langkah tersebut.
+- "connections" adalah array string dengan panjang 2, menjelaskan data flow atau hubungan aksi antar komponen (Node 1 -> Node 2, dan Node 2 -> Node 3) pada langkah ini. Wajib disesuaikan dengan bahasa terpilih (Bahasa Inggris jika 'en', Bahasa Indonesia jika 'id').
 - ${languageInstruction}
 
 Input pengguna yang harus kamu eksekusi saat ini adalah: "${concept}"`;
@@ -161,44 +166,48 @@ Input pengguna yang harus kamu eksekusi saat ini adalah: "${concept}"`;
         contents: prompt,
         config: {
           responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                tema: { type: Type.STRING },
-                deskripsi: { type: Type.STRING },
-                komponen: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      label: { type: Type.STRING },
-                      analogi: { type: Type.STRING },
-                      svgNormal: { type: Type.STRING },
-                      svgBroken: { type: Type.STRING },
-                    },
-                    required: ["label", "analogi", "svgNormal", "svgBroken"],
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              tema: { type: Type.STRING },
+              deskripsi: { type: Type.STRING },
+              komponen: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    label: { type: Type.STRING },
+                    analogi: { type: Type.STRING },
+                    svgNormal: { type: Type.STRING },
+                    svgBroken: { type: Type.STRING },
                   },
-                },
-                langkah: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      kode: { type: Type.STRING },
-                      judul: { type: Type.STRING },
-                      ibaratnya: { type: Type.STRING },
-                      kenyataannya: { type: Type.STRING },
-                      nodeStates: {
-                        type: Type.ARRAY,
-                        items: { type: Type.BOOLEAN },
-                      },
-                    },
-                    required: ["kode", "judul", "ibaratnya", "kenyataannya", "nodeStates"],
-                  },
+                  required: ["label", "analogi", "svgNormal", "svgBroken"],
                 },
               },
-              required: ["tema", "deskripsi", "komponen", "langkah"],
+              langkah: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    kode: { type: Type.STRING },
+                    judul: { type: Type.STRING },
+                    ibaratnya: { type: Type.STRING },
+                    kenyataannya: { type: Type.STRING },
+                    nodeStates: {
+                      type: Type.ARRAY,
+                      items: { type: Type.BOOLEAN },
+                    },
+                    connections: {
+                      type: Type.ARRAY,
+                      items: { type: Type.STRING },
+                    },
+                  },
+                  required: ["kode", "judul", "ibaratnya", "kenyataannya", "nodeStates", "connections"],
+                },
+              },
             },
+            required: ["tema", "deskripsi", "komponen", "langkah"],
+          },
         },
       });
 

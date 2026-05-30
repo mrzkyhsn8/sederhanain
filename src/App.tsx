@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Loader2, ChevronRight, ChevronLeft, LogOut, Command, Search, X, AlertOctagon, Sparkles, Lock, History, ArrowRight } from "lucide-react";
+import { Loader2, ChevronRight, ChevronLeft, LogOut, Command, Search, X, AlertOctagon, Sparkles, Lock, History, ArrowRight, Volume2, Play, Pause, Square } from "lucide-react";
 import { useGoogleLogin, googleLogout } from '@react-oauth/google';
 
 interface Komponen {
@@ -21,6 +21,7 @@ interface Langkah {
   ibaratnya: string;
   kenyataannya: string;
   nodeStates: boolean[];
+  connections: string[];
 }
 
 interface SederhanainData {
@@ -57,9 +58,9 @@ const STEPS = [
 function SvgNode({ node, active, broken, step, index }: any) {
   const sc = STEPS[step];
   const svgContent = broken ? (node.svgBroken || node.svgNormal) : node.svgNormal;
-  
-  // Enhanced design choices for high-contrast broken system failure state:
-  const col = active ? sc.color : (broken ? "#EF4444" : "#2A2D2A");
+
+  // Design choices for active, broken, and beautiful high-contrast inactive standby states:
+  const col = active ? sc.color : (broken ? "#EF4444" : "#4B5563"); // rich slate grey for inactive nodes
   const glowSize = active ? "0 0 28px" : (broken ? "0 0 16px" : "none");
   const glowColor = active ? sc.glow : "rgba(239, 68, 68, 0.25)";
 
@@ -67,7 +68,7 @@ function SvgNode({ node, active, broken, step, index }: any) {
     <div
       style={{
         display: "flex", flexDirection: "column", alignItems: "center", gap: "10px",
-        opacity: active ? 1 : (broken ? 0.95 : 0.22), transition: "opacity .5s ease",
+        opacity: active ? 1 : (broken ? 0.95 : 0.45), transition: "opacity .5s ease", // raised inactive opacity to 0.45 for perfect legibility
       }}
     >
       <div style={{ position: "relative", width: "110px", height: "110px" }}>
@@ -79,31 +80,31 @@ function SvgNode({ node, active, broken, step, index }: any) {
           }} />
         )}
         <svg viewBox="0 0 110 110" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
-          <circle cx="55" cy="55" r="52" fill="none" stroke={col} strokeWidth={active ? "1.5" : (broken ? "1.2" : "0.5")}
+          <circle cx="55" cy="55" r="52" fill="none" stroke={col} strokeWidth={active ? "1.5" : (broken ? "1.2" : "0.75")}
             strokeDasharray={broken ? "4 4" : active ? "8 4" : "none"}
-            strokeOpacity={active ? 0.8 : (broken ? 0.6 : 0.3)}
+            strokeOpacity={active ? 0.8 : (broken ? 0.6 : 0.4)}
             style={active ? { animation: "dashMove 2s linear infinite" } : {}}
           />
         </svg>
         <div style={{
           position: "absolute", inset: "8px", borderRadius: "50%",
-          background: active ? `${sc.color}10` : (broken ? "#150505" : "#0C0D0C"),
-          border: `${active ? "1.5" : (broken ? "1" : "0.5")}px solid ${col}`,
+          background: active ? `${sc.color}10` : (broken ? "#150505" : "#0D0E0D"),
+          border: `${active ? "1.5" : (broken ? "1" : "0.75")}px solid ${col}`,
           display: "flex", alignItems: "center", justifyContent: "center",
           boxShadow: active ? `${glowSize} ${sc.glow}, inset 0 0 20px ${sc.color}08` : (broken ? `${glowSize} ${glowColor}, inset 0 0 16px rgba(239,68,68,0.06)` : "none"),
           transition: "all .5s ease", overflow: "hidden",
         }}>
           <svg viewBox="0 0 60 60" width="50" height="50" style={{
-            color: active ? col : (broken ? "#EF4444" : col), transition: "color .5s ease",
+            color: active ? col : (broken ? "#EF4444" : "#4B5563"), transition: "color .5s ease",
             filter: broken ? `drop-shadow(0 0 6px rgba(239,68,68,0.7))` : active ? `drop-shadow(0 0 4px ${sc.color}66)` : "none",
           }} dangerouslySetInnerHTML={{ __html: svgContent }} />
         </div>
       </div>
       <div style={{ textAlign: "center" }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "8px", color: active ? sc.color : (broken ? "#EF4444" : "#2A2D2A"), letterSpacing: "1.5px", marginBottom: "4px", transition: "color .5s" }}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "8px", color: active ? sc.color : (broken ? "#EF4444" : "#4B5563"), letterSpacing: "1.5px", marginBottom: "4px", transition: "color .5s" }}>
           {node.label}
         </div>
-        <div style={{ fontSize: "13px", fontWeight: "600", color: active ? "#E4E8E4" : (broken ? "#FCA5A5" : "#383B38"), transition: "color .5s" }}>
+        <div style={{ fontSize: "13px", fontWeight: "600", color: active ? "#E4E8E4" : (broken ? "#FCA5A5" : "#6B7280"), transition: "color .5s" }}>
           {node.analogi}
         </div>
       </div>
@@ -111,12 +112,57 @@ function SvgNode({ node, active, broken, step, index }: any) {
   );
 }
 
-function Connection({ active, broken, step }: any) {
+function Connection({ active, broken, step, label }: any) {
   const sc = STEPS[step];
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", paddingBottom: "28px" }}>
-      <svg width="80" height="2">
-        <line x1="0" y1="1" x2="80" y2="1" stroke={active ? sc.color : "#1C1F1C"} strokeWidth="1.5" strokeDasharray={active ? "6 4" : "4 4"} strokeOpacity={active ? 0.85 : 0.3} style={active ? { animation: "dashMove 1.5s linear infinite" } : {}} />
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", width: "130px", paddingBottom: "28px" }}>
+      {/* Label Text above the connection line */}
+      {label && (
+        <span style={{
+          position: "absolute",
+          top: "-18px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: "7.5px",
+          fontWeight: "600",
+          color: active ? sc.color : (broken ? "#EF4444" : "#4B5563"),
+          textTransform: "uppercase",
+          letterSpacing: "0.5px",
+          whiteSpace: "nowrap",
+          opacity: active ? 0.9 : 0.5,
+          transition: "color .5s, opacity .5s",
+          pointerEvents: "none",
+          background: "#050505",
+          padding: "2px 6px",
+          borderRadius: "4px",
+          border: `1px dashed ${active ? `${sc.color}30` : (broken ? "rgba(239,68,68,0.15)" : "rgba(75,85,99,0.15)")}`,
+          zIndex: 10,
+        }}>
+          {label}
+        </span>
+      )}
+
+      {/* Line SVG */}
+      <svg width="130" height="4" style={{ overflow: "visible" }}>
+        {/* Glowing backdrop shadow line for active states */}
+        {active && (
+          <line
+            x1="0" y1="2" x2="130" y2="2"
+            stroke={sc.color}
+            strokeWidth="3"
+            strokeOpacity="0.15"
+            style={{ filter: "blur(2px)" }}
+          />
+        )}
+        <line
+          x1="0" y1="2" x2="130" y2="2"
+          stroke={active ? sc.color : (broken ? "#EF4444" : "#2A2D2A")}
+          strokeWidth={active ? "1.5" : (broken ? "1.2" : "0.75")}
+          strokeDasharray={broken ? "4 4" : active ? "6 4" : "4 4"}
+          strokeOpacity={active ? 0.85 : (broken ? 0.6 : 0.3)}
+          style={active ? { animation: "dashMove 1.5s linear infinite" } : {}}
+        />
       </svg>
     </div>
   );
@@ -303,7 +349,10 @@ const TRANSLATIONS: Record<string, any> = {
         question: "Topik apa yang pas dicoba?",
         answer: "Bebas! Cobalah memasukkan kata kunci bidang IT (seperti Docker, Kubernetes, React Effect), Teori Fisika (Relativitas, Kucing Schrödinger), sampai istilah Finansial (Inflasi, Deflasi, Reksadana)."
       }
-    ]
+    ],
+    audioNarrator: "Dengarkan Cerita",
+    audioPlaying: "Membaca Analogi...",
+    audioAutoAdvanceDesc: "Otomatis lanjut ke langkah berikutnya saat selesai membaca"
   },
   en: {
     assembling: "Assembling Analogy",
@@ -383,7 +432,10 @@ const TRANSLATIONS: Record<string, any> = {
         question: "What topics are best to try?",
         answer: "Anything! Try entering keywords in IT (like Docker, Kubernetes, React Effect), Physics Theories (Relativity, Schrödinger's Cat), or Financial terms (Inflation, Deflation, Mutual Funds)."
       }
-    ]
+    ],
+    audioNarrator: "Listen Analogy",
+    audioPlaying: "Reading Analogy...",
+    audioAutoAdvanceDesc: "Automatically advance to the next step when finished reading"
   }
 };
 
@@ -415,6 +467,131 @@ export default function App() {
       console.error(e);
     }
   };
+
+  // Audio Storytelling States
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [autoAdvance, setAutoAdvance] = useState(true);
+  const [currentUtterance, setCurrentUtterance] = useState<any>(null);
+
+  // Audio Storytelling Helpers
+  const speakStep = (stepIdx: number) => {
+    if (!data) return;
+
+    // 1. Cancel any active speech first
+    window.speechSynthesis.cancel();
+    setIsPlaying(false);
+    setIsPaused(false);
+
+    const l = data.langkah[stepIdx];
+    if (!l) return;
+
+    // 2. Build the spoken narrative text with warm conversational connectors
+    const stepLabel = lang === "en" ? "Step" : "Langkah";
+    const textToSpeak = lang === "en"
+      ? `${stepLabel} ${stepIdx + 1}, ${l.judul}. Imagine it like this: ${l.ibaratnya}. In the real world: ${l.kenyataannya}`
+      : `${stepLabel} ${stepIdx + 1}, ${l.judul}. Ibarat cerita: ${l.ibaratnya}. Dan dalam kenyataan teknologinya: ${l.kenyataannya}`;
+
+    // 3. Initialize utterance
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+
+    // 4. Select optimized highly-natural premium/neural voice
+    const voices = window.speechSynthesis.getVoices();
+    const matchingVoices = voices.filter(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
+
+    let voice = null;
+    if (matchingVoices.length > 0) {
+      // Priority 1: Microsoft Natural Online voices (incredibly realistic Edge voices)
+      const microsoftOnline = matchingVoices.find(v =>
+        v.name.toLowerCase().includes("microsoft") &&
+        (v.name.toLowerCase().includes("natural") || v.name.toLowerCase().includes("online"))
+      );
+
+      // Priority 2: Google Chrome natural voices
+      const googleVoice = matchingVoices.find(v =>
+        v.name.toLowerCase().includes("google")
+      );
+
+      // Priority 3: Apple Safari Siri/Natural voices
+      const naturalVoice = matchingVoices.find(v =>
+        v.name.toLowerCase().includes("natural")
+      );
+
+      // Priority 4: Local offline premium services
+      const localVoice = matchingVoices.find(v => v.localService);
+
+      voice = microsoftOnline || googleVoice || naturalVoice || localVoice || matchingVoices[0];
+    }
+
+    if (voice) {
+      utterance.voice = voice;
+    }
+
+    // Slight speech speed optimization for warm, natural cadence
+    utterance.rate = lang === "id" ? 0.94 : 0.96;
+    utterance.pitch = 1.0;
+
+    // 5. Event bindings
+    utterance.onstart = () => {
+      setIsPlaying(true);
+      setIsPaused(false);
+    };
+
+    utterance.onend = () => {
+      setIsPlaying(false);
+      setIsPaused(false);
+
+      // Auto advance functionality
+      if (autoAdvance && stepIdx < data.langkah.length - 1) {
+        setTimeout(() => {
+          setCurrentStepIdx(prev => {
+            const nextIdx = prev + 1;
+            speakStep(nextIdx);
+            return nextIdx;
+          });
+        }, 1500); // 1.5s peaceful buffer between steps
+      }
+    };
+
+    utterance.onerror = () => {
+      setIsPlaying(false);
+      setIsPaused(false);
+    };
+
+    // 6. Speak!
+    window.speechSynthesis.speak(utterance);
+    setCurrentUtterance(utterance);
+  };
+
+  const pauseSpeech = () => {
+    window.speechSynthesis.pause();
+    setIsPaused(true);
+  };
+
+  const resumeSpeech = () => {
+    window.speechSynthesis.resume();
+    setIsPaused(false);
+  };
+
+  const stopSpeech = () => {
+    window.speechSynthesis.cancel();
+    setIsPlaying(false);
+    setIsPaused(false);
+  };
+
+  // Stop speech if page is unloaded or details change
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, []);
+
+  // Stop speech if they trigger a new search or go back
+  useEffect(() => {
+    window.speechSynthesis.cancel();
+    setIsPlaying(false);
+    setIsPaused(false);
+  }, [data, isLoading]);
 
   const t = TRANSLATIONS[lang];
 
@@ -695,9 +872,9 @@ export default function App() {
               </button>
 
               {/* Integrated Search Bar (Unified Input + Internal Submit Button) */}
-              <motion.form 
-                layoutId="search-form" 
-                onSubmit={handleSubmit} 
+              <motion.form
+                layoutId="search-form"
+                onSubmit={handleSubmit}
                 className="relative items-center w-full max-w-[240px] lg:max-w-[280px] hidden md:flex"
               >
                 <div className="relative w-full">
@@ -711,16 +888,15 @@ export default function App() {
                   />
                   {/* Left Search Icon */}
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
-                  
+
                   {/* Embedded Right Action Button */}
                   <button
                     type="submit"
                     disabled={isLoading || !conceptInput.trim()}
-                    className={`absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 focus:outline-none ${
-                      conceptInput.trim() 
-                        ? "bg-emerald-500 text-black hover:bg-emerald-400 cursor-pointer shadow-md shadow-emerald-500/20" 
+                    className={`absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 focus:outline-none ${conceptInput.trim()
+                        ? "bg-emerald-500 text-black hover:bg-emerald-400 cursor-pointer shadow-md shadow-emerald-500/20"
                         : "bg-white/5 text-zinc-600 opacity-40 cursor-not-allowed"
-                    }`}
+                      }`}
                     title={t.analysisBtn}
                   >
                     {isLoading ? (
@@ -743,7 +919,7 @@ export default function App() {
         {!data && !isLoading && (
           <div className="w-full flex flex-col items-center relative z-10">
             {/* LANDING PAGE HEADER */}
-            <div className="absolute top-0 left-0 right-0 h-20 px-4 sm:px-8 flex items-center justify-between z-50">
+            <div className="absolute top-0 left-0 right-0 h-20 px-4 sm:px-8 flex items-center justify-between z-50 fixed bg-[#050505]">
               <div className="flex items-baseline gap-3">
                 <span className="text-lg sm:text-xl font-black tracking-tighter uppercase text-emerald-400 select-none">
                   Sederhanain.
@@ -1161,6 +1337,71 @@ export default function App() {
                             className="overflow-hidden fade-up"
                           >
                             <div className="mt-3 flex flex-col gap-3 rounded-xl p-4" style={{ background: isc.bg, border: `0.5px solid ${isc.color}33` }}>
+                              {/* Audio Storytelling Controller */}
+                              <div className="flex items-center justify-between border-b border-white/10 pb-2.5 mb-1">
+                                <div className="flex items-center gap-2">
+                                  {isPlaying ? (
+                                    /* Beautiful pulsing audio visualizer waves */
+                                    <div className="flex items-end gap-[1.5px] h-3.5 w-4 pb-0.5">
+                                      <div className="w-[2px] bg-emerald-400 rounded-full animate-pulse" style={{ height: "40%" }} />
+                                      <div className="w-[2px] bg-emerald-400 rounded-full animate-pulse" style={{ height: "100%" }} />
+                                      <div className="w-[2px] bg-emerald-400 rounded-full animate-pulse" style={{ height: "60%" }} />
+                                      <div className="w-[2px] bg-emerald-400 rounded-full animate-pulse" style={{ height: "80%" }} />
+                                    </div>
+                                  ) : (
+                                    <Volume2 className="w-3.5 h-3.5 text-zinc-400" />
+                                  )}
+                                  <span className="text-[9px] uppercase tracking-wider font-mono font-bold text-zinc-400">
+                                    {isPlaying ? t.audioPlaying : t.audioNarrator}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  {/* Auto advance toggle pill */}
+                                  <button
+                                    type="button"
+                                    onClick={() => setAutoAdvance(prev => !prev)}
+                                    className={`px-2 py-0.5 rounded text-[8px] font-bold font-mono transition-all duration-300 border cursor-pointer ${autoAdvance
+                                        ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                                        : "bg-white/5 border-white/5 text-zinc-500 hover:text-zinc-400"
+                                      }`}
+                                    title={t.audioAutoAdvanceDesc}
+                                  >
+                                    AUTO PLAY
+                                  </button>
+
+                                  {/* Play / Pause / Stop buttons */}
+                                  <div className="flex items-center gap-1 bg-black/40 border border-white/5 p-0.5 rounded-lg">
+                                    {isPlaying ? (
+                                      <>
+                                        <button
+                                          type="button"
+                                          onClick={() => isPaused ? resumeSpeech() : pauseSpeech()}
+                                          className="p-1 text-emerald-400 hover:text-emerald-300 hover:bg-white/5 rounded transition cursor-pointer"
+                                        >
+                                          {isPaused ? <Play className="w-3 h-3 fill-current" /> : <Pause className="w-3 h-3 fill-current" />}
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => stopSpeech()}
+                                          className="p-1 text-red-400 hover:text-red-300 hover:bg-white/5 rounded transition cursor-pointer"
+                                        >
+                                          <Square className="w-3 h-3 fill-current" />
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <button
+                                        type="button"
+                                        onClick={() => speakStep(idx)}
+                                        className="p-1 text-emerald-400 hover:text-emerald-300 hover:bg-white/5 rounded transition cursor-pointer"
+                                      >
+                                        <Play className="w-3 h-3 fill-current" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
                               <div>
                                 <span className="text-[9px] uppercase tracking-widest font-bold block mb-1.5" style={{ color: isc.color }}>{t.ibaratnya}:</span>
                                 <p className="text-sm text-white/80 leading-relaxed italic py-0.5 font-serif">
@@ -1269,6 +1510,7 @@ export default function App() {
                                   active={ns[i] !== false && ns[i + 1] !== false}
                                   broken={isBroken}
                                   step={currentStepIdx}
+                                  label={data.langkah[currentStepIdx].connections?.[i]}
                                 />
                               )}
                             </div>
