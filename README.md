@@ -11,15 +11,19 @@
 
 ## ✨ Key Features
 
-- **Google Gen AI Integration**: Powered by Google's Gemini API, providing highly accurate, contextual, and creative real-world analogies to simplify any complex concept or term you throw at it.
-- **Dynamic Generative UI**: Supports 3 dynamic visual layout strategies generated dynamically:
-  - `PIPELINE` (Flowing horizontal flow / feedback loop).
-  - `SPLIT_LANES` (Parallel comparison / vertical race).
-  - `HUB_AND_SPOKE` (A single central node surrounded by multiple branches).
-- **Google OAuth 2.0 Authentication**: Seamlessly integrated authentication. The login prompt only appears in an action-driven manner (when a user clicks the "Analysis" button for the first time).
-- **Rate Limiting**: Restricts each user to a maximum of **5 requests per 24 hours**, securely locked on the backend using their Google email address.
-- **Tester Whitelist**: Testers can be exempted from daily rate limits via environment variable configuration (`WHITELIST_EMAILS`).
-- **Local Analysis History (Instant Cache)**: Securely stores up to the last 5 search histories in the browser's `localStorage`. Reopening past histories works instantly and **does not consume the daily rate limit quota**!
+- **Google Gen AI Integration**: Powered by Google's latest Gemini API (`gemini-3-flash-preview`), dynamically producing highly accurate, creative, and context-aware real-world analogies to simplify any abstract or complex technical term.
+- **Dynamic Interactive Simulations**: Leverages Generative UI to construct an interactive network diagram of components with custom inline SVGs representing normal and broken states, combined with animated flow connections.
+- **Bilingual Support (English & Indonesian)**: Full localization across UI elements and AI prompts, allowing users to toggle seamlessly between English (`en`) and Indonesian (`id`) with instant adaptation of generated results.
+- **Smart Audio Storytelling (TTS)**: Built-in narration system with full media controls (Play, Pause, Stop) that reads your analogies aloud. It automatically detects and employs high-quality natural/online voices matching the selected language, with an optional auto-advance mode.
+- **Universal Command Palette (`Ctrl+K`)**: Keyboard-shortcut driven modal to search past query histories, browse FAQs, or trigger key app actions instantly.
+- **Share & Export Center**: Easily save and distribute your analogies:
+  - Generate and download beautiful high-resolution PNG infographic cards (via `html2canvas`).
+  - Copy structured text summaries directly to the clipboard.
+  - Instantly share insights to Twitter (X) and WhatsApp.
+- **Google OAuth 2.0 Authentication**: Seamless, action-driven login flow. Authentication is only required on-demand when a user clicks the "Analysis" button for the first time.
+- **Secure Backend Rate Limiting**: Restricts users to a maximum of **5 requests per 24 hours**, locked securely on the Express backend using verified Google OAuth email addresses.
+- **Namespaced User History Cache**: Securely caches up to 5 analysis histories per user inside namespaced browser storage (`sederhanain_history_${google_user_sub}`). Reopening past histories loads instantly and **does not consume the daily rate limit quota**!
+- **Tester Whitelist**: Bypass rate limits for specific testing accounts using a comma-separated list of emails in environment variables (`WHITELIST_EMAILS`).
 
 ---
 
