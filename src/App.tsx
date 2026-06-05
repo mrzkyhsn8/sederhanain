@@ -12,6 +12,13 @@ import { STEPS, TRANSLATIONS } from "./constants/translations";
 import { captureAndDownload } from "./utils/capture";
 import { useAudioNarrator } from "./hooks/useAudioNarrator";
 import { useGoogleAuth } from "./hooks/useGoogleAuth";
+import { InteractiveLoader } from "./components/visualizer/InteractiveLoader";
+import { VisualizerCanvas } from "./components/visualizer/VisualizerCanvas";
+import { Header } from "./components/layout/Header";
+import { Footer } from "./components/layout/Footer";
+import { Accordion } from "./components/ui/Accordion";
+import { CommandPalette } from "./components/ui/CommandPalette";
+import { ShareModal } from "./components/ui/ShareModal";
 
 const STYLE = `
 @keyframes dashMove{to{stroke-dashoffset:-24}}
@@ -24,219 +31,7 @@ if (typeof document !== 'undefined' && !document.querySelector("#sdhn-svg-style"
   document.head.appendChild(el);
 }
 
-function SvgNode({ node, active, broken, step, index }: any) {
-  const sc = STEPS[step];
-  const svgContent = broken ? (node.svgBroken || node.svgNormal) : node.svgNormal;
 
-  // Design choices for active, broken, and beautiful high-contrast inactive standby states:
-  const col = active ? sc.color : (broken ? "#EF4444" : "#4B5563"); // rich slate grey for inactive nodes
-  const glowSize = active ? "0 0 28px" : (broken ? "0 0 16px" : "none");
-  const glowColor = active ? sc.glow : "rgba(239, 68, 68, 0.25)";
-
-  return (
-    <div
-      style={{
-        display: "flex", flexDirection: "column", alignItems: "center", gap: "10px",
-        opacity: active ? 1 : (broken ? 0.95 : 0.45), transition: "opacity .5s ease",
-      }}
-    >
-      <div style={{ position: "relative", width: "110px", height: "110px" }}>
-        {active && (
-          <div style={{
-            position: "absolute", inset: "-8px", borderRadius: "50%",
-            border: `1px solid ${sc.color}`, opacity: 0,
-            animation: `pulse ${2 + index * 0.4}s ease ${index * 0.3}s infinite`,
-          }} />
-        )}
-        <svg viewBox="0 0 110 110" style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}>
-          <circle cx="55" cy="55" r="52" fill="none" stroke={col} strokeWidth={active ? "1.5" : (broken ? "1.2" : "0.75")}
-            strokeDasharray={broken ? "4 4" : active ? "8 4" : "none"}
-            strokeOpacity={active ? 0.8 : (broken ? 0.6 : 0.4)}
-            style={active ? { animation: "dashMove 2s linear infinite" } : {}}
-          />
-        </svg>
-        <div style={{
-          position: "absolute", inset: "8px", borderRadius: "50%",
-          background: active ? `${sc.color}10` : (broken ? "#150505" : "#0D0E0D"),
-          border: `${active ? "1.5" : (broken ? "1" : "0.75")}px solid ${col}`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: active ? `${glowSize} ${sc.glow}, inset 0 0 20px ${sc.color}08` : (broken ? `${glowSize} ${glowColor}, inset 0 0 16px rgba(239,68,68,0.06)` : "none"),
-          transition: "all .5s ease", overflow: "hidden",
-        }}>
-          <svg viewBox="0 0 60 60" width="50" height="50" style={{
-            color: active ? col : (broken ? "#EF4444" : "#4B5563"), transition: "color .5s ease",
-            filter: broken ? `drop-shadow(0 0 6px rgba(239,68,68,0.7))` : active ? `drop-shadow(0 0 4px ${sc.color}66)` : "none",
-          }} dangerouslySetInnerHTML={{ __html: svgContent }} />
-        </div>
-      </div>
-      <div style={{ textAlign: "center" }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "8px", color: active ? sc.color : (broken ? "#EF4444" : "#4B5563"), letterSpacing: "1.5px", marginBottom: "4px", transition: "color .5s" }}>
-          {node.label}
-        </div>
-        <div style={{ fontSize: "13px", fontWeight: "600", color: active ? "#E4E8E4" : (broken ? "#FCA5A5" : "#6B7280"), transition: "color .5s" }}>
-          {node.analogi}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Connection({ active, broken, step, label }: any) {
-  const sc = STEPS[step];
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", position: "relative", width: "130px", paddingBottom: "28px" }}>
-      {/* Label Text above the connection line */}
-      {label && (
-        <span style={{
-          position: "absolute",
-          top: "-18px",
-          left: "50%",
-          transform: "translateX(-50%)",
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: "7.5px",
-          fontWeight: "600",
-          color: active ? sc.color : (broken ? "#EF4444" : "#4B5563"),
-          textTransform: "uppercase",
-          letterSpacing: "0.5px",
-          whiteSpace: "nowrap",
-          opacity: active ? 0.9 : 0.5,
-          transition: "color .5s, opacity .5s",
-          pointerEvents: "none",
-          background: "#050505",
-          padding: "2px 6px",
-          borderRadius: "4px",
-          border: `1px dashed ${active ? `${sc.color}30` : (broken ? "rgba(239,68,68,0.15)" : "rgba(75,85,99,0.15)")}`,
-          zIndex: 10,
-        }}>
-          {label}
-        </span>
-      )}
-
-      {/* Line SVG */}
-      <svg width="130" height="4" style={{ overflow: "visible" }}>
-        {/* Glowing backdrop shadow line for active states */}
-        {active && (
-          <line
-            x1="0" y1="2" x2="130" y2="2"
-            stroke={sc.color}
-            strokeWidth="3"
-            strokeOpacity="0.15"
-            style={{ filter: "blur(2px)" }}
-          />
-        )}
-        <line
-          x1="0" y1="2" x2="130" y2="2"
-          stroke={active ? sc.color : (broken ? "#EF4444" : "#2A2D2A")}
-          strokeWidth={active ? "1.5" : (broken ? "1.2" : "0.75")}
-          strokeDasharray={broken ? "4 4" : active ? "6 4" : "4 4"}
-          strokeOpacity={active ? 0.85 : (broken ? 0.6 : 0.3)}
-          style={active ? { animation: "dashMove 1.5s linear infinite" } : {}}
-        />
-      </svg>
-    </div>
-  );
-}
-
-function InteractiveLoader({ concept, lang }: { concept: string; lang: "id" | "en" }) {
-  const [currentPhaseIdx, setCurrentPhaseIdx] = useState(0);
-
-  const t = TRANSLATIONS[lang];
-  const phases = t.loadingSteps;
-  const loadingPhases = [
-    { id: "analyze", text: phases[0] },
-    { id: "brainstorm", text: phases[1] },
-    { id: "connect", text: phases[2] },
-    { id: "render", text: phases[3] }
-  ];
-
-  useEffect(() => {
-    const timers = [
-      setTimeout(() => setCurrentPhaseIdx(1), 1800),
-      setTimeout(() => setCurrentPhaseIdx(2), 3800),
-      setTimeout(() => setCurrentPhaseIdx(3), 5500),
-    ];
-    return () => {
-      timers.forEach(clearTimeout);
-    };
-  }, []);
-
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center text-emerald-400 max-w-md mx-auto px-6 py-12">
-      {/* Central Pulsing & Spinning Loader Ring */}
-      <div className="relative flex items-center justify-center mb-10">
-        {/* Glow behind loader */}
-        <div className="absolute w-24 h-24 bg-emerald-500/10 rounded-full blur-xl animate-pulse"></div>
-        {/* Orbit ring */}
-        <div className="absolute w-20 h-20 rounded-full border border-emerald-500/10 animate-[spin_6s_linear_infinite]"></div>
-        <div className="absolute w-20 h-20 rounded-full border-t border-emerald-400 animate-spin"></div>
-        <Loader2 className="w-10 h-10 animate-spin text-emerald-400 z-10" />
-      </div>
-
-      {/* Title */}
-      <h3 className="text-white font-medium text-sm tracking-[0.1em] uppercase mb-1 text-center">
-        {t.assembling}
-      </h3>
-      {concept && (
-        <p className="text-white/40 text-[11px] font-mono mb-8 text-center truncate max-w-xs">
-          {t.topicLabel} <span className="text-emerald-400 font-semibold">{concept}</span>
-        </p>
-      )}
-
-      {/* Progressive Checklist */}
-      <div className="w-full space-y-4 bg-zinc-950/40 border border-white/5 rounded-2xl p-6 backdrop-blur-sm">
-        {loadingPhases.map((phase, idx) => {
-          const isDone = idx < currentPhaseIdx;
-          const isActive = idx === currentPhaseIdx;
-
-          return (
-            <motion.div
-              key={phase.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1, duration: 0.3 }}
-              className={`flex items-center gap-3 transition-colors duration-300 ${isActive ? "text-emerald-400" : isDone ? "text-emerald-500/70" : "text-white/20"
-                }`}
-            >
-              {/* Checkbox status indicator */}
-              <div className="flex items-center justify-center shrink-0">
-                {isDone ? (
-                  <div className="w-5 h-5 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 animate-in zoom-in duration-300">
-                    <svg
-                      className="w-3 h-3"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                ) : isActive ? (
-                  <div className="w-5 h-5 rounded-full border border-emerald-400/30 flex items-center justify-center relative">
-                    <div className="absolute inset-0 rounded-full border-t-2 border-emerald-400 animate-spin"></div>
-                    <div className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></div>
-                  </div>
-                ) : (
-                  <div className="w-5 h-5 rounded-full border border-white/10 flex items-center justify-center">
-                    <div className="w-1 h-1 bg-white/10 rounded-full"></div>
-                  </div>
-                )}
-              </div>
-
-              {/* Phase Text */}
-              <span
-                className={`text-xs font-medium tracking-wide transition-all duration-300 ${isActive ? "text-emerald-300 drop-shadow-[0_0_8px_rgba(52,211,153,0.3)] font-semibold" : ""
-                  }`}
-              >
-                {phase.text}
-              </span>
-            </motion.div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 export default function App() {
   const [conceptInput, setConceptInput] = useState("");
@@ -396,200 +191,32 @@ export default function App() {
   );
 
 
-  const renderLanguageSwitcher = () => (
-    <div className="flex items-center gap-1 bg-white/5 p-1 rounded-full border border-white/10 shrink-0 select-none">
-      <button
-        type="button"
-        onClick={() => handleLanguageChange("id")}
-        className={`px-2.5 py-1 text-[9px] font-bold rounded-full transition-all cursor-pointer ${lang === "id" ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20 font-black" : "text-zinc-400 hover:text-white"}`}
-      >
-        ID
-      </button>
-      <button
-        type="button"
-        onClick={() => handleLanguageChange("en")}
-        className={`px-2.5 py-1 text-[9px] font-bold rounded-full transition-all cursor-pointer ${lang === "en" ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20 font-black" : "text-zinc-400 hover:text-white"}`}
-      >
-        EN
-      </button>
-    </div>
-  );
 
-  const renderProfileMenu = () => {
-    if (!token || !userProfile) return null;
-
-    const initial = (userProfile.name || userProfile.email || "?").charAt(0).toUpperCase();
-
-    return (
-      <div className="relative z-50 shrink-0">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsProfileOpen((prev) => !prev);
-          }}
-          className="w-9 h-9 rounded-full border border-white/10 hover:border-emerald-500/50 shadow-md hover:shadow-[0_0_12px_rgba(16,185,129,0.3)] transition-all duration-300 relative overflow-hidden flex items-center justify-center shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-500/20 bg-zinc-950"
-        >
-          {userProfile.picture ? (
-            <img
-              src={userProfile.picture}
-              alt={userProfile.name || userProfile.email}
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div className="w-full h-full bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-sm font-mono font-bold text-white uppercase select-none">
-              {initial}
-            </div>
-          )}
-        </button>
-
-        {isProfileOpen && (
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="absolute right-0 mt-2.5 w-60 bg-zinc-950/95 backdrop-blur-md border border-zinc-800 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] p-2 z-[999] animate-in fade-in slide-in-from-top-2 duration-150 origin-top-right text-left"
-          >
-            {/* User details */}
-            <div className="px-3 py-2.5">
-              {userProfile.name && (
-                <div className="text-xs font-bold text-zinc-100 truncate mb-0.5">
-                  {userProfile.name}
-                </div>
-              )}
-              <div className="text-[10px] font-mono text-zinc-500 truncate">
-                {userProfile.email}
-              </div>
-            </div>
-
-            <div className="border-t border-zinc-800 my-1"></div>
-
-            {/* Logout button */}
-            <button
-              type="button"
-              onClick={() => {
-                setIsProfileOpen(false);
-                handleLogout();
-              }}
-              className="w-full text-left p-2.5 rounded-xl hover:bg-red-500/10 text-zinc-400 hover:text-red-400 text-xs font-semibold flex items-center gap-2 cursor-pointer transition-colors duration-150"
-            >
-              <LogOut className="w-3.5 h-3.5 shrink-0" />
-              <span>Logout</span>
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  };
 
   return (
     <div className={`min-h-screen bg-[#050505] text-white flex flex-col font-sans selection:bg-emerald-500 selection:text-white ${data ? "md:h-screen md:overflow-hidden" : ""}`}>
-      <AnimatePresence>
-        {(data || isLoading) && (
-          <motion.header
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, transition: { duration: 0 } }}
-            className="h-20 px-4 sm:px-8 flex items-center justify-between border-b border-white/10 shrink-0"
-          >
-            <div className="flex items-baseline gap-3">
-              <button
-                onClick={() => { setData(null); setIsLoading(false); setConceptInput(''); }}
-                className="text-lg sm:text-xl md:text-2xl font-black tracking-tighter uppercase text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
-              >
-                Sederhanain.
-              </button>
-              <span className="hidden md:inline text-[10px] uppercase tracking-[0.3em] font-medium text-white/40">AI Concept Visualizer</span>
-            </div>
-
-            <div className="flex items-center gap-2.5 sm:gap-4">
-              {/* History Button (Icon-only, sleek circular layout) */}
-              <button
-                type="button"
-                onClick={() => setIsCommandOpen(true)}
-                className="flex items-center justify-center w-9 h-9 bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-emerald-400 border border-white/10 hover:border-emerald-500/30 rounded-full shadow-md transition-all duration-200 cursor-pointer shrink-0 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                title={`${t.searchHistoryHeader} (Ctrl + K)`}
-              >
-                <History className="w-4 h-4" />
-              </button>
-
-              {/* Integrated Search Bar (Unified Input + Internal Submit Button) */}
-              <motion.form
-                layoutId="search-form"
-                onSubmit={handleSubmit}
-                className="relative items-center w-full max-w-[240px] lg:max-w-[280px] hidden md:flex"
-              >
-                <div className="relative w-full">
-                  <motion.input
-                    layoutId="search-input"
-                    type="text"
-                    className="w-full bg-white/[0.03] hover:bg-white/[0.06] focus:bg-white/[0.08] border border-white/10 focus:border-emerald-500/50 rounded-full pl-9 pr-9 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all placeholder:text-white/30 font-mono"
-                    placeholder={t.placeholder}
-                    value={conceptInput}
-                    onChange={(e) => setConceptInput(e.target.value)}
-                  />
-                  {/* Left Search Icon */}
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-500 pointer-events-none" />
-
-                  {/* Embedded Right Action Button */}
-                  <button
-                    type="submit"
-                    disabled={isLoading || !conceptInput.trim()}
-                    className={`absolute right-1.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 focus:outline-none ${conceptInput.trim()
-                      ? "bg-emerald-500 text-black hover:bg-emerald-400 cursor-pointer shadow-md shadow-emerald-500/20"
-                      : "bg-white/5 text-zinc-600 opacity-40 cursor-not-allowed"
-                      }`}
-                    title={t.analysisBtn}
-                  >
-                    {isLoading ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                    )}
-                  </button>
-                </div>
-              </motion.form>
-
-              {renderLanguageSwitcher()}
-              {renderProfileMenu()}
-            </div>
-          </motion.header>
-        )}
-      </AnimatePresence>
+      <Header
+        data={data}
+        isLoading={isLoading}
+        conceptInput={conceptInput}
+        setConceptInput={setConceptInput}
+        token={token}
+        userProfile={userProfile}
+        isProfileOpen={isProfileOpen}
+        setIsProfileOpen={setIsProfileOpen}
+        setIsCommandOpen={setIsCommandOpen}
+        lang={lang}
+        handleLanguageChange={handleLanguageChange}
+        handleSubmit={handleSubmit}
+        handleLogout={handleLogout}
+        login={login}
+        resetApp={() => { setData(null); setIsLoading(false); setConceptInput(''); }}
+      />
 
       <main className={`flex-1 flex flex-col-reverse md:flex-row relative ${data ? "md:h-[calc(100vh-80px)] md:overflow-hidden" : ""}`}>
         {!data && !isLoading && (
           <div className="w-full flex flex-col items-center relative z-10">
-            {/* LANDING PAGE HEADER */}
-            <div className="absolute top-0 left-0 right-0 h-20 px-4 sm:px-8 flex items-center justify-between z-50 fixed bg-[#050505]">
-              <div className="flex items-baseline gap-3">
-                <span className="text-lg sm:text-xl font-black tracking-tighter uppercase text-emerald-400 select-none">
-                  Sederhanain.
-                </span>
-                <span className="hidden sm:inline text-[9px] uppercase tracking-[0.25em] font-medium text-white/30 select-none">
-                  AI Concept Visualizer
-                </span>
-              </div>
-              <div className="flex items-center gap-2.5 sm:gap-4">
-                {renderLanguageSwitcher()}
-                {token ? (
-                  renderProfileMenu()
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => login()}
-                    className="flex items-center gap-2 px-5 py-2 rounded-full border border-white/10 hover:border-emerald-500/50 bg-zinc-950/80 hover:bg-emerald-500/5 text-zinc-300 hover:text-emerald-400 text-xs font-bold tracking-wide transition-all duration-300 shadow-md hover:shadow-[0_0_15px_rgba(16,185,129,0.2)] cursor-pointer"
-                  >
-                    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24">
-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05" />
-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335" />
-                    </svg>
-                    <span>{t.loginText}</span>
-                  </button>
-                )}
-              </div>
-            </div>
+
 
             {/* BACKGROUND GRID */}
             <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
@@ -829,40 +456,7 @@ export default function App() {
                 <h2 className="text-2xl md:text-3xl font-bold tracking-tight mb-3 text-center">{t.faqTitle}</h2>
                 <p className="text-white/50 mb-10 text-center text-sm md:text-base">{t.faqSubtitle}</p>
 
-                <div className="w-full flex flex-col gap-4">
-                  {t.faq.map((item: any, idx: number) => {
-                    const isOpen = openFaqIdx === idx;
-                    return (
-                      <div
-                        key={idx}
-                        className="bg-white/[0.02] border border-white/5 rounded-2xl overflow-hidden group hover:border-emerald-500/20 hover:bg-white/[0.03] transition-all duration-300"
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setOpenFaqIdx(isOpen ? null : idx)}
-                          className="w-full text-left p-6 flex justify-between items-center cursor-pointer select-none focus:outline-none"
-                        >
-                          <span className={`font-bold text-sm md:text-base transition-colors duration-300 ${isOpen ? "text-emerald-400" : "text-zinc-200 group-hover:text-emerald-400"}`}>
-                            {item.question}
-                          </span>
-                          <span className={`text-xs ml-4 flex items-center justify-center w-6 h-6 rounded-full bg-white/5 text-zinc-400 group-hover:text-emerald-400 group-hover:bg-emerald-500/10 transition-all duration-300 transform ${isOpen ? "rotate-90 text-emerald-400 bg-emerald-500/10" : ""}`}>
-                            <ChevronRight className="w-3.5 h-3.5" />
-                          </span>
-                        </button>
-
-                        <div
-                          className={`grid transition-all duration-300 ease-in-out ${isOpen ? "grid-rows-[1fr] opacity-100 border-t border-white/5" : "grid-rows-[0fr] opacity-0"}`}
-                        >
-                          <div className="overflow-hidden">
-                            <div className="p-6 pt-4 text-xs md:text-sm text-white/60 leading-relaxed font-medium">
-                              {item.answer}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <Accordion faq={t.faq} openIdx={openFaqIdx} setOpenIdx={setOpenFaqIdx} />
               </div>
 
 
@@ -884,44 +478,7 @@ export default function App() {
                 </div>
 
                 {/* FOOTER */}
-                <footer className="w-full px-6 py-12 md:px-12 relative z-10">
-                  <div className="max-w-7xl mx-auto">
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-12 mb-12">
-                      {/* Brand & Description */}
-                      <div className="col-span-1 md:col-span-4 flex flex-col gap-4">
-                        <span className="text-2xl font-black tracking-tighter uppercase text-emerald-400">
-                          Sederhanain.
-                        </span>
-                        <p className="text-sm text-white/50 leading-relaxed pr-4">
-                          {t.footerDesc}
-                        </p>
-                      </div>
-
-                      {/* Quick Links & Disclaimer */}
-                      <div className="col-span-1 md:col-span-8 flex flex-col sm:flex-row gap-10 md:justify-end">
-                        <div className="flex flex-col gap-4">
-                          <h4 className="text-emerald-400 font-bold mb-1 uppercase tracking-wider text-xs">Quick Links</h4>
-                          <a href="#" className="text-sm text-white/60 hover:text-emerald-400 hover:translate-x-1 transition-all w-fit">{t.aboutUs}</a>
-                          <a href="#" className="text-sm text-white/60 hover:text-emerald-400 hover:translate-x-1 transition-all w-fit">{t.githubRepo}</a>
-                          <a href="#" className="text-sm text-white/60 hover:text-emerald-400 hover:translate-x-1 transition-all w-fit">{t.privacyPolicy}</a>
-                        </div>
-
-                        <div className="flex flex-col gap-4 max-w-sm">
-                          <h4 className="text-emerald-400 font-bold mb-1 uppercase tracking-wider text-xs">{t.aiDisclaimerTitle}</h4>
-                          <p className="text-xs text-white/40 leading-relaxed bg-white/5 p-4 rounded-xl border border-white/5">
-                            {t.aiDisclaimerText}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Copyright */}
-                    <div className="border-t border-white/10 pt-8 flex flex-col-reverse md:flex-row justify-between items-center gap-4 text-xs text-white/40 font-mono tracking-wide">
-                      <p>© 2026 Sederhanain. All rights reserved.</p>
-                      <p>Built with Google AI Studio</p>
-                    </div>
-                  </div>
-                </footer>
+                <Footer lang={lang} />
               </div>
             </div>
           </div>
@@ -1129,419 +686,37 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="w-full flex-1 flex flex-col justify-center items-center my-auto pb-6 md:pb-10 z-10">
-                <div className="w-full p-6 rounded-2xl border transition-all duration-500 relative flex flex-col items-center justify-center min-h-[400px]" style={{
-                  background: 'transparent', borderColor: 'rgba(255,255,255,0.05)',
-                  backgroundImage: `radial-gradient(ellipse 60% 60% at 50% 50%, ${STEPS[currentStepIdx].glow} 0%, transparent 70%)`
-                }}>
-                  <div className="absolute top-2 left-4 text-[9px] font-mono tracking-wider text-white/30 uppercase flex items-center gap-2">
-                    <span style={{ color: currentStepIdx === 3 ? "#FF4D4D" : "#1C1F1C" }}>▲</span> {t.internalSystem}
-                  </div>
-
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={currentStepIdx}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 1.05 }}
-                      transition={{ duration: 0.4 }}
-                      className="w-full flex justify-center items-center pt-4 overflow-x-auto"
-                    >
-                      <div style={{ display: "flex", alignItems: "center", gap: "0" }}>
-                        {data.komponen?.map((node, i) => {
-                          const ns = data.langkah[currentStepIdx].nodeStates || [true, true, true];
-                          const isBroken = currentStepIdx === 3;
-                          const isActive = ns[i] !== false;
-
-                          return (
-                            <div key={i} style={{ display: "flex", alignItems: "center" }}>
-                              <SvgNode
-                                node={node}
-                                active={isActive}
-                                broken={isBroken}
-                                step={currentStepIdx}
-                                index={i}
-                              />
-                              {i < data.komponen.length - 1 && (
-                                <Connection
-                                  active={isActive && ns[i + 1] !== false}
-                                  broken={isBroken}
-                                  step={currentStepIdx}
-                                  label={data.langkah[currentStepIdx].connections?.[i]}
-                                />
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
-                  </AnimatePresence>
-                </div>
-              </div>
+              <VisualizerCanvas data={data} currentStepIdx={currentStepIdx} lang={lang} />
             </section>
           </>
         )}
       </main>
-      {isCommandOpen && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] px-4">
-          {/* Latar Belakang Gelap Transparan */}
-          <div
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm transition-opacity duration-300"
-            onClick={() => setIsCommandOpen(false)}
-          />
+      <CommandPalette
+        isCommandOpen={isCommandOpen}
+        setIsCommandOpen={setIsCommandOpen}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        filteredHistory={filteredHistory}
+        conceptInput={conceptInput}
+        data={data}
+        deleteHistoryItem={deleteHistoryItem}
+        onSelectHistoryItem={(item) => {
+          setConceptInput(item.concept);
+          setData(item.data);
+          setCurrentStepIdx(0);
+        }}
+      />
 
-          {/* Kotak Pencarian Utama */}
-          <div className="bg-zinc-950 border border-zinc-800/80 w-full max-w-xl rounded-2xl shadow-2xl relative z-10 overflow-hidden text-zinc-100">
-
-            {/* INPUT FIELD PENCARIAN */}
-            <div className="p-4 border-b border-zinc-800 flex items-center gap-3">
-              <Search className="w-5 h-5 text-zinc-500 shrink-0" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari konsep, tema analogi, atau riwayat anda..."
-                className="w-full bg-transparent border-none text-sm text-zinc-100 placeholder-zinc-500 outline-none font-mono focus:ring-0 focus:outline-none"
-                autoFocus
-              />
-              <button
-                onClick={() => setIsCommandOpen(false)}
-                className="text-zinc-500 hover:text-zinc-300 p-1 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* DAFTAR HASIL PENCARIAN */}
-            <div className="max-h-[320px] overflow-y-auto p-2 space-y-4">
-
-              {/* Grup 1: Riwayat Analogi yang Tersedia */}
-              <div>
-                <span className="px-3 py-1 text-[9px] font-mono uppercase tracking-widest text-zinc-500 block mb-2">
-                  RIWAYAT PENCARIAN AKTIF ({filteredHistory.length})
-                </span>
-
-                {filteredHistory.length > 0 ? (
-                  <div className="space-y-1">
-                    {filteredHistory.map((item, idx) => {
-                      const isActiveTopic = data && item.concept.toLowerCase() === conceptInput.toLowerCase();
-                      return (
-                        <div
-                          key={idx}
-                          className={`w-full flex items-center justify-between p-1 rounded-xl transition duration-150 group/item
-                            ${isActiveTopic
-                              ? 'bg-emerald-950/20 border border-emerald-500/20 text-emerald-400'
-                              : 'hover:bg-zinc-900/60 border border-transparent text-zinc-400 hover:text-white'
-                            }`}
-                        >
-                          {/* Main Clickable Area to Select History */}
-                          <div
-                            onClick={() => {
-                              setConceptInput(item.concept);
-                              setData(item.data);
-                              setCurrentStepIdx(0);
-                              setIsCommandOpen(false);
-                            }}
-                            className="flex-1 text-left p-2 flex items-center justify-between cursor-pointer"
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className={`h-8 w-8 rounded-lg flex items-center justify-center border transition shrink-0
-                                ${isActiveTopic
-                                  ? 'bg-emerald-950 border-emerald-500/30 text-emerald-400'
-                                  : 'bg-zinc-900 border-zinc-800 text-zinc-500 group-hover:text-emerald-400 group-hover:border-emerald-500/30'
-                                }`}
-                              >
-                                <Sparkles className="w-4 h-4" />
-                              </div>
-                              <div>
-                                <span className="font-mono text-xs font-bold block">{item.concept}</span>
-                                <span className="text-[10px] text-zinc-500 block group-hover:text-zinc-400 truncate max-w-[200px] md:max-w-xs">{item.data.tema}</span>
-                              </div>
-                            </div>
-
-
-                            <div className="flex items-center gap-2">
-                              {/* Delete Button */}
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  deleteHistoryItem(item.concept);
-                                }}
-                                className="p-2 mr-1 text-zinc-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition duration-150 cursor-pointer shrink-0 opacity-0 group-hover/item:opacity-100 focus:opacity-100"
-                                title="Hapus dari riwayat"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-
-                              <div className="flex items-center gap-2">
-                                {isActiveTopic && (
-                                  <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30">
-                                    AKTIF
-                                  </span>
-                                )}
-                                <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-300" />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-zinc-500 text-xs font-mono">
-                    <AlertOctagon className="w-8 h-8 mx-auto mb-2 text-zinc-600" />
-                    Riwayat "{searchQuery}" tidak ditemukan.
-                  </div>
-                )}
-              </div>
-
-              {/* Tips Navigasi */}
-              <div className="border-t border-zinc-800 pt-3 px-3 flex justify-between items-center text-[10px] font-mono text-zinc-600">
-                <span className="flex items-center gap-1">
-                  <span className="px-1 py-0.5 bg-zinc-900 border border-zinc-800 rounded">ESC</span>
-                  <span>untuk menutup</span>
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="px-1 py-0.5 bg-zinc-900 border border-zinc-800 rounded">Click</span>
-                  <span>untuk memuat</span>
-                </span>
-              </div>
-
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* ═══ SHARE MODAL ═══ */}
-      {isShareOpen && data && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4 py-8">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/80 backdrop-blur-md"
-            onClick={() => { setIsShareOpen(false); setCopiedShare(false); }}
-          />
-
-          {/* Modal Content */}
-          <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-zinc-950 border border-zinc-800/80 shadow-2xl [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/10 [&::-webkit-scrollbar-thumb]:rounded-full">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-zinc-800 sticky top-0 bg-zinc-950/95 backdrop-blur-sm z-10">
-              <div className="flex items-center gap-2">
-                <Share2 className="w-4 h-4 text-emerald-400" />
-                <span className="text-sm font-bold text-zinc-100">{t.shareTitle}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setIsShareOpen(false); setCopiedShare(false); }}
-                className="text-zinc-500 hover:text-zinc-300 p-1 cursor-pointer transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Share Card Preview (Variant A — Full Story Card) */}
-            <div className="p-4">
-              <div
-                ref={shareCardRef}
-                style={{
-                  width: "100%",
-                  background: "#070908",
-                  border: "0.5px solid #222622",
-                  borderRadius: "14px",
-                  overflow: "hidden",
-                  fontFamily: "'Inter', sans-serif",
-                }}
-              >
-                {/* Top Bar */}
-                <div style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "12px 16px",
-                  borderBottom: "0.5px solid #1a1e1a",
-                  background: "#080908",
-                }}>
-                  <div style={{ fontSize: "13px", fontWeight: 700, color: "#00e87c", letterSpacing: "1.5px" }}>
-                    SEDERHANAIN.<span style={{ color: "#2a2d2a" }}> AI VISUALIZER</span>
-                  </div>
-                  <div style={{ fontSize: "9px", color: "#2a2d2a", letterSpacing: "1.5px" }}>
-                    {t.shareCardSubtitle}
-                  </div>
-                </div>
-
-                {/* Header: Topic + Tema + Description + Nodes */}
-                <div style={{ padding: "16px 16px 12px", borderBottom: "0.5px solid #1a1e1a" }}>
-                  {/* Searched concept/topic */}
-                  <div style={{
-                    display: "inline-block",
-                    fontSize: "9px", fontWeight: 600, color: "#00e87c",
-                    letterSpacing: "1px", textTransform: "uppercase",
-                    background: "rgba(0,232,124,0.08)",
-                    border: "0.5px solid rgba(0,232,124,0.2)",
-                    borderRadius: "20px",
-                    padding: "2px 10px",
-                    marginBottom: "8px",
-                  }}>
-                    {t.shareCardTopic}: {conceptInput}
-                  </div>
-                  <div style={{ fontSize: "20px", fontWeight: 700, color: "#e4e8e4", marginBottom: "3px", letterSpacing: "-0.3px" }}>
-                    {data.tema}
-                  </div>
-                  <div style={{ fontSize: "11px", color: "#4a4d4a", lineHeight: 1.6 }}>
-                    {data.deskripsi}
-                  </div>
-                  {/* Nodes */}
-                  <div style={{ display: "flex", gap: "6px", marginTop: "10px", flexWrap: "wrap" }}>
-                    {data.komponen?.map((k, idx) => (
-                      <div key={idx} style={{
-                        display: "flex", alignItems: "center", gap: "5px",
-                        background: "#0d100d", border: "0.5px solid #1a1e1a",
-                        borderRadius: "20px", padding: "3px 10px",
-                      }}>
-                        <div style={{
-                          width: "5px", height: "5px", borderRadius: "50%", flexShrink: 0,
-                          background: STEPS[idx]?.color || "#00e87c",
-                        }} />
-                        <span style={{ fontSize: "9px", color: "#4a4d4a", letterSpacing: "0.5px" }}>
-                          {k.label} → {k.analogi}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 4 Steps */}
-                <div style={{ padding: "12px 16px", display: "flex", flexDirection: "column", gap: 0 }}>
-                  {data.langkah?.map((l, idx) => {
-                    const sc = STEPS[idx];
-                    const stepColors = ["#00e87c", "#ffb830", "#ff5733", "#9b1c1c"];
-                    const c = stepColors[idx] || sc?.color || "#00e87c";
-                    return (
-                      <div key={idx} style={{
-                        display: "flex", gap: "12px", padding: "9px 0",
-                        borderBottom: idx < 3 ? "0.5px solid #111311" : "none",
-                      }}>
-                        {/* Step Color Bar */}
-                        <div style={{
-                          width: "3px", flexShrink: 0, borderRadius: "2px",
-                          alignSelf: "stretch", marginTop: "2px", marginBottom: "2px",
-                          background: c,
-                        }} />
-                        {/* Step Number */}
-                        <div style={{
-                          width: "22px", height: "22px", borderRadius: "5px", flexShrink: 0,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: "10px", fontWeight: 700, marginTop: "1px",
-                          background: `${c}1A`, color: c,
-                        }}>
-                          {idx + 1}
-                        </div>
-                        {/* Step Content */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: "8px", letterSpacing: "1.5px", marginBottom: "2px", color: c }}>
-                            {l.kode} · {lang === "en" ? "STEP" : "LANGKAH"} 0{idx + 1}
-                          </div>
-                          <div style={{
-                            fontSize: "12px", fontWeight: 500, color: "#d4d8d4", marginBottom: "3px",
-                            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                          }}>
-                            {l.judul}
-                          </div>
-                          <div style={{ fontSize: "10px", color: "#4a4d4a", lineHeight: 1.6 }}>
-                            "{l.ibaratnya}"
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Footer */}
-                <div style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "10px 16px",
-                  borderTop: "0.5px solid #1a1e1a",
-                  background: "#080908",
-                }}>
-                  <div style={{ fontSize: "9px", color: "#2a2d2a", letterSpacing: "0.5px" }}>sederhanain.web.app</div>
-                  <div style={{ fontSize: "9px", color: "#00e87c44", letterSpacing: "1px" }}>{t.shareCardCta}</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Share Action Buttons */}
-            <div className="p-4 pt-0 grid grid-cols-2 gap-2">
-              {/* Share to X */}
-              <button
-                type="button"
-                onClick={() => {
-                  const text = `🧠 ${lang === "id" ? "Baru belajar tentang" : "Just learned about"} "${conceptInput}" ${lang === "id" ? "di" : "on"} Sederhanain!\n\n${data.tema}\n${data.deskripsi}\n\n1️⃣ ${data.langkah[0]?.judul}\n2️⃣ ${data.langkah[1]?.judul}\n3️⃣ ${data.langkah[2]?.judul}\n4️⃣ ${data.langkah[3]?.judul}\n\n${lang === "id" ? "Coba sendiri" : "Try it"} → sederhanain.web.app\n#Sederhanain #BelajarMudah`;
-                  window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank');
-                }}
-                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white text-xs font-semibold transition-all cursor-pointer"
-              >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
-                {t.shareToX}
-              </button>
-
-              {/* Share to WhatsApp */}
-              <button
-                type="button"
-                onClick={() => {
-                  const text = `🧠 *${conceptInput}* — ${data.tema}\n\n${data.deskripsi}\n\n1️⃣ ${data.langkah[0]?.judul}\n2️⃣ ${data.langkah[1]?.judul}\n3️⃣ ${data.langkah[2]?.judul}\n4️⃣ ${data.langkah[3]?.judul}\n\n${lang === "id" ? "Coba sendiri" : "Try it"} → sederhanain.web.app`;
-                  window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
-                }}
-                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-zinc-900 hover:bg-emerald-950/50 border border-zinc-800 hover:border-emerald-500/30 text-zinc-300 hover:text-emerald-400 text-xs font-semibold transition-all cursor-pointer"
-              >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
-                {t.shareToWhatsApp}
-              </button>
-
-              {/* Download PNG */}
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!shareCardRef.current) return;
-                  const filename = `sederhanain-${conceptInput.toLowerCase().replace(/\s+/g, '-')}.png`;
-                  try {
-                    await captureAndDownload(shareCardRef.current, filename);
-                  } catch (err) {
-                    console.error('Failed to capture card:', err);
-                  }
-                }}
-                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white text-xs font-semibold transition-all cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5" />
-                {t.shareDownloadPNG}
-              </button>
-
-              {/* Copy to Clipboard */}
-              <button
-                type="button"
-                onClick={async () => {
-                  const text = `🧠 ${lang === "id" ? "Baru belajar tentang" : "Just learned about"} "${conceptInput}" ${lang === "id" ? "di" : "on"} Sederhanain!\n\n📖 ${data.tema}\n${data.deskripsi}\n\n1️⃣ ${data.langkah[0]?.judul}\n2️⃣ ${data.langkah[1]?.judul}\n3️⃣ ${data.langkah[2]?.judul}\n4️⃣ ${data.langkah[3]?.judul}\n\n🔗 sederhanain.web.app\n#Sederhanain`;
-                  try {
-                    await navigator.clipboard.writeText(text);
-                    setCopiedShare(true);
-                    setTimeout(() => setCopiedShare(false), 2500);
-                  } catch (err) {
-                    console.error('Failed to copy:', err);
-                  }
-                }}
-                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${copiedShare
-                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-                  : "bg-zinc-900 hover:bg-zinc-800 border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white"
-                  }`}
-              >
-                {copiedShare ? (
-                  <><Check className="w-3.5 h-3.5" /> {t.shareCopied}</>
-                ) : (
-                  <><Copy className="w-3.5 h-3.5" /> {t.shareCopyClipboard}</>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ShareModal
+        isShareOpen={isShareOpen}
+        setIsShareOpen={setIsShareOpen}
+        data={data}
+        conceptInput={conceptInput}
+        lang={lang}
+        copiedShare={copiedShare}
+        setCopiedShare={setCopiedShare}
+        shareCardRef={shareCardRef}
+      />
     </div>
   );
 }
