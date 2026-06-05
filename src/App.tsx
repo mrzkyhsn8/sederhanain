@@ -7,36 +7,11 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Loader2, ChevronRight, ChevronLeft, LogOut, Command, Search, X, AlertOctagon, Sparkles, Lock, History, ArrowRight, Volume2, Play, Pause, Square, Trash2, Share2, Download, Copy, Check } from "lucide-react";
 import { useGoogleLogin, googleLogout } from '@react-oauth/google';
-import html2canvas from 'html2canvas';
-
-interface Komponen {
-  label: string;
-  analogi: string;
-  svgNormal: string;
-  svgBroken: string;
-}
-
-interface Langkah {
-  kode: string;
-  judul: string;
-  ibaratnya: string;
-  kenyataannya: string;
-  nodeStates: boolean[];
-  connections: string[];
-}
-
-interface SederhanainData {
-  tema: string;
-  deskripsi: string;
-  komponen: Komponen[];
-  langkah: Langkah[];
-}
-
-interface HistoryItem {
-  concept: string;
-  data: SederhanainData;
-  timestamp: number;
-}
+import { Komponen, Langkah, SederhanainData, HistoryItem } from "./types";
+import { STEPS, TRANSLATIONS } from "./constants/translations";
+import { captureAndDownload } from "./utils/capture";
+import { useAudioNarrator } from "./hooks/useAudioNarrator";
+import { useGoogleAuth } from "./hooks/useGoogleAuth";
 
 const STYLE = `
 @keyframes dashMove{to{stroke-dashoffset:-24}}
@@ -48,13 +23,6 @@ if (typeof document !== 'undefined' && !document.querySelector("#sdhn-svg-style"
   el.textContent = STYLE;
   document.head.appendChild(el);
 }
-
-const STEPS = [
-  { color: "#00E87C", glow: "rgba(0,232,124,.22)", bg: "rgba(0,232,124,.06)", badge: "SECURE & STABLE", label: "LANGKAH 01" },
-  { color: "#FFB830", glow: "rgba(255,184,48,.22)", bg: "rgba(255,184,48,.06)", badge: "ALERT: WARNING", label: "LANGKAH 02" },
-  { color: "#FF5733", glow: "rgba(255,87,51,.22)", bg: "rgba(255,87,51,.06)", badge: "CRITICAL", label: "LANGKAH 03" },
-  { color: "#FF4D4D", glow: "rgba(255,77,77,.35)", bg: "rgba(255,77,77,.08)", badge: "SYSTEM FAILURE", label: "LANGKAH 04" },
-];
 
 function SvgNode({ node, active, broken, step, index }: any) {
   const sc = STEPS[step];
@@ -270,203 +238,11 @@ function InteractiveLoader({ concept, lang }: { concept: string; lang: "id" | "e
   );
 }
 
-
-const TRANSLATIONS: Record<string, any> = {
-  id: {
-    assembling: "Merakit Analogi",
-    topicLabel: "Topik:",
-    title: "Bikin Konsep Rumit Jadi",
-    titleHighlight: "Sederhana.",
-    subtitle: "Platform interaktif berbasis Generative UI yang mengubah teori kaku, istilah, hingga fenomena sains menjadi simulasi analogi dunia nyata secara real-time.",
-    placeholder: "Ketik topik: Misal WebSockets...",
-    analysisBtn: "Analisis",
-    popularTopics: "Topik Populer:",
-    historyAlert: "Lihat Riwayat Analisis Anda",
-    loginText: "Masuk",
-    searchHistoryBtn: "CARI RIWAYAT ANDA",
-    searchHistoryHeader: "CARI RIWAYAT",
-    faqTitle: "Pertanyaan yang Sering Muncul 🤔",
-    faqSubtitle: "Mungkin kamu punya salah satu pertanyaan ini.",
-    readyTitle: "Siap Mencerna",
-    readyTitleHighlight: "Konsep Rumit?",
-    readySubtitle: "Berhenti membuang waktu memahami dokumentasi yang membosankan. Biarkan AI kami yang menerjemahkannya ke dalam bahasa manusia untukmu.",
-    readyBtn: "Mulai Coba Gratis 🚀",
-    stepLabel: "LANGKAH",
-    badgeSecure: "AMAN & STABIL",
-    badgeWarning: "PERINGATAN",
-    badgeCritical: "KRITIS",
-    badgeFailure: "KEGAGALAN SISTEM",
-    ibaratnya: "Ibaratnya",
-    kenyataannya: "Kenyataannya",
-    analogyTheme: "Tema Analogi",
-    nextBtn: "Selanjutnya",
-    finishBtn: "Selesai ✓",
-    internalSystem: "SISTEM INTERNAL",
-    activeStateSimulation: "SIMULASI KONDISI AKTIF",
-    backToMain: "Kembali ke Menu Utama",
-    logout: "Logout",
-    historyTitle: "Riwayat Analisis",
-    historyEmpty: "Belum ada riwayat",
-    howTitle: "Bagaimana Sederhanain Bekerja? 🤔",
-    howSubtitle: "Hanya butuh tiga langkah simpel untuk mengubah teks buku yang membosankan menjadi cerita visual yang nempel di otak.",
-    step1Title: "Ketik Topikmu",
-    step1Desc: "Masukkan istilah abstrak apa saja, mulai dari WebSockets, Inflasi, hingga Black Hole.",
-    step2Title: "AI Meracik Analogi",
-    step2Desc: "Mesin Sederhanain menerjemahkan teori kaku menjadi skenario cerita sehari-hari.",
-    step3Title: "Mainkan Simulasi",
-    step3Desc: "Lihat visualisasi interaktif langkah-demi-langkah yang bergerak dinamis di layarmu.",
-    showcaseTitle: "Dari Teori Kaku Menjadi Cerita Seru",
-    showcaseSubtitle: "Bandingkan sendiri bagaimana Sederhanain mengubah bahasa teknis yang membosankan menjadi analogi visual yang mudah dicerna otak.",
-    beforeLabel: "Buku Teks / Wikipedia",
-    beforeTitle: "Definisi WebSockets",
-    beforeText: "\"WebSocket adalah protokol komunikasi komputer, yang menyediakan full-duplex communication channels atas koneksi TCP tunggal. Protokol WebSocket distandarisasi oleh IETF sebagai RFC 6455...\"",
-    afterLabel: "Hasil Sederhanain",
-    afterTitle: "Analogi: Pipa Air 2 Arah",
-    afterText: "\"Bayangkan sebuah pipa air ajaib di mana air bisa mengalir dari dua arah sekaligus tanpa harus menunggu giliran. Tidak perlu cape bertanya 'halo, apakah ada air?' setiap detik (polling). Begitu air siap, ia akan langsung menyembur ke arahmu!\"",
-    intuitiveBadge: "Intuitif",
-    realtimeBadge: "Real-time",
-    footerDesc: "Mengubah konsep abstrak dan teori yang rumit menjadi analogi interaktif yang menyenangkan. Belajar tidak pernah se-intuitif ini.",
-    aboutUs: "Tentang Kami",
-    githubRepo: "GitHub Repository",
-    privacyPolicy: "Privacy Policy",
-    aiDisclaimerTitle: "AI Disclaimer 🤖",
-    aiDisclaimerText: "Platform ini ditenagai oleh Generative AI. Analogi yang dihasilkan mungkin tidak 100% akurat secara teknis atau saintifik. Gunakan aplikasi ini sebagai jembatan pemahaman awal, bukan sumber kebenaran mutlak.",
-    loadingSteps: [
-      "Menganalisis topik...",
-      "Merancang analogi yang sesuai...",
-      "Menghubungkan komponen sistem...",
-      "Menyiapkan visualisasi simulasi..."
-    ],
-    faq: [
-      {
-        question: "Apakah Sederhanain 100% gratis?",
-        answer: "Ya! Karena ini masih versi Beta eksploratif, kamu bisa menganalisis topik apa saja."
-      },
-      {
-        question: "Teknologi apa yang ada di baliknya?",
-        answer: "Kami mengandalkan kombinasi ajaib dari Google Gemini API (untuk bernalar dan meracik analogi), serta React & Tailwind untuk merender UI yang interaktif (Generative UI) secara instan."
-      },
-      {
-        question: "Topik apa yang pas dicoba?",
-        answer: "Bebas! Cobalah memasukkan kata kunci bidang IT (seperti Docker, Kubernetes, React Effect), Teori Fisika (Relativitas, Kucing Schrödinger), sampai istilah Finansial (Inflasi, Deflasi, Reksadana)."
-      }
-    ],
-    audioNarrator: "Dengarkan Cerita",
-    audioPlaying: "Membaca Analogi...",
-    audioAutoAdvanceDesc: "Otomatis lanjut ke langkah berikutnya saat selesai membaca",
-    shareBtn: "Bagikan",
-    shareTitle: "Bagikan Analogi",
-    shareToX: "Bagikan ke X",
-    shareToWhatsApp: "Bagikan ke WhatsApp",
-    shareDownloadPNG: "Unduh Gambar",
-    shareCopyClipboard: "Salin Teks",
-    shareCopied: "Tersalin!",
-    shareCardSubtitle: "ANALOGI LENGKAP · 4 LANGKAH",
-    shareCardCta: "Pelajari analogimu sendiri →",
-    shareCardTopic: "Topik"
-  },
-  en: {
-    assembling: "Assembling Analogy",
-    topicLabel: "Topic:",
-    title: "Make Complex Concepts",
-    titleHighlight: "Simple.",
-    subtitle: "An interactive Generative UI platform that transforms rigid theories, terminology, and scientific phenomena into real-world analogical simulations in real-time.",
-    placeholder: "Type a topic: e.g. WebSockets...",
-    analysisBtn: "Analyze",
-    popularTopics: "Popular Topics:",
-    historyAlert: "View Your Analysis History",
-    loginText: "Login",
-    searchHistoryBtn: "SEARCH YOUR HISTORY",
-    searchHistoryHeader: "SEARCH HISTORY",
-    faqTitle: "Frequently Asked Questions 🤔",
-    faqSubtitle: "You might have one of these questions in mind.",
-    readyTitle: "Ready to Digest",
-    readyTitleHighlight: "Complex Concepts?",
-    readySubtitle: "Stop wasting time on boring documentation. Let our AI translate it into human language for you.",
-    readyBtn: "Start Free Trial 🚀",
-    stepLabel: "STEP",
-    badgeSecure: "SECURE & STABLE",
-    badgeWarning: "ALERT: WARNING",
-    badgeCritical: "CRITICAL",
-    badgeFailure: "SYSTEM FAILURE",
-    ibaratnya: "Analogy",
-    kenyataannya: "Reality",
-    analogyTheme: "Analogy Theme",
-    nextBtn: "Next",
-    finishBtn: "Finish ✓",
-    internalSystem: "INTERNAL SYSTEM",
-    activeStateSimulation: "ACTIVE STATE SIMULATION",
-    backToMain: "Back to Main Screen",
-    logout: "Logout",
-    historyTitle: "Analysis History",
-    historyEmpty: "No history yet",
-    howTitle: "How Sederhanain Works? 🤔",
-    howSubtitle: "It only takes three simple steps to transform boring textbook definitions into a visual story that sticks in your mind.",
-    step1Title: "Type Your Topic",
-    step1Desc: "Enter any abstract concept, from WebSockets and Inflation to Black Holes.",
-    step2Title: "AI Crafts Analogy",
-    step2Desc: "The Sederhanain engine translates rigid theories into everyday real-life scenarios.",
-    step3Title: "Play the Simulation",
-    step3Desc: "Watch step-by-step interactive visualizations animate dynamically on your screen.",
-    showcaseTitle: "From Rigid Theory to Exciting Story",
-    showcaseSubtitle: "See for yourself how Sederhanain turns dry technical jargon into highly digestible visual analogies.",
-    beforeLabel: "Textbook / Wikipedia",
-    beforeTitle: "WebSockets Definition",
-    beforeText: "\"WebSocket is a computer communication protocol, providing full-duplex communication channels over a single TCP connection. The WebSocket protocol was standardized by the IETF as RFC 6455...\"",
-    afterLabel: "Sederhanain Result",
-    afterTitle: "Analogy: 2-Way Water Pipe",
-    afterText: "\"Imagine a magical water pipe where water can flow from both directions at the same time without waiting for turns. No need to exhaustingly ask 'hello, is there water?' every second (polling). Once water is ready, it squirts right at you!\"",
-    intuitiveBadge: "Intuitive",
-    realtimeBadge: "Real-time",
-    footerDesc: "Transforming abstract concepts and complex theories into delightful interactive analogies. Learning has never been this intuitive.",
-    aboutUs: "About Us",
-    githubRepo: "GitHub Repository",
-    privacyPolicy: "Privacy Policy",
-    aiDisclaimerTitle: "AI Disclaimer 🤖",
-    aiDisclaimerText: "This platform is powered by Generative AI. The generated analogies might not be 100% technically or scientifically accurate. Use this application as a bridge for initial understanding, not as an absolute source of truth.",
-    loadingSteps: [
-      "Analyzing topic...",
-      "Designing suitable analogy...",
-      "Connecting system components...",
-      "Preparing simulation visualization..."
-    ],
-    faq: [
-      {
-        question: "Is Sederhanain 100% free?",
-        answer: "Yes! Since this is an exploratory Beta version, you can analyze any topic without search limits."
-      },
-      {
-        question: "What technology is running behind it?",
-        answer: "We rely on the magical combination of Google Gemini API (for outstanding reasoning and crafting analogies), and React & Tailwind to render the interactive UI (Generative UI) instantly."
-      },
-      {
-        question: "What topics are best to try?",
-        answer: "Anything! Try entering keywords in IT (like Docker, Kubernetes, React Effect), Physics Theories (Relativity, Schrödinger's Cat), or Financial terms (Inflation, Deflation, Mutual Funds)."
-      }
-    ],
-    audioNarrator: "Listen Analogy",
-    audioPlaying: "Reading Analogy...",
-    audioAutoAdvanceDesc: "Automatically advance to the next step when finished reading",
-    shareBtn: "Share",
-    shareTitle: "Share Analogy",
-    shareToX: "Share to X",
-    shareToWhatsApp: "Share to WhatsApp",
-    shareDownloadPNG: "Download Image",
-    shareCopyClipboard: "Copy Text",
-    shareCopied: "Copied!",
-    shareCardSubtitle: "FULL ANALOGY · 4 STEPS",
-    shareCardCta: "Explore your own analogy →",
-    shareCardTopic: "Topic"
-  }
-};
-
 export default function App() {
   const [conceptInput, setConceptInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState<SederhanainData | null>(null);
   const [currentStepIdx, setCurrentStepIdx] = useState(0);
-  const [token, setToken] = useState<string | null>(null);
-  const [userProfile, setUserProfile] = useState<{ email: string; sub: string; name?: string; picture?: string } | null>(null);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -489,136 +265,35 @@ export default function App() {
     }
   };
 
-  // Audio Storytelling States
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
-  const [autoAdvance, setAutoAdvance] = useState(true);
-  const [currentUtterance, setCurrentUtterance] = useState<any>(null);
-
-
   // Shareable Insights States
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [copiedShare, setCopiedShare] = useState(false);
   const shareCardRef = useRef<HTMLDivElement>(null);
 
-  // Audio Storytelling Helpers
-  const speakStep = (stepIdx: number) => {
-    if (!data) return;
+  // Hook Integrations
+  const {
+    token,
+    userProfile,
+    history,
+    login,
+    handleLogout,
+    deleteHistoryItem,
+    saveToHistory,
+    setHistory,
+  } = useGoogleAuth((accessToken, profileSub) => {
+    executeAnalysis(conceptInput, accessToken, profileSub);
+  });
 
-    // 1. Cancel any active speech first
-    window.speechSynthesis.cancel();
-    setIsPlaying(false);
-    setIsPaused(false);
-
-    const l = data.langkah[stepIdx];
-    if (!l) return;
-
-    // 2. Build the spoken narrative text with warm conversational connectors
-    const stepLabel = lang === "en" ? "Step" : "Langkah";
-    const textToSpeak = lang === "en"
-      ? `${stepLabel} ${stepIdx + 1}, ${l.judul}. Imagine it like this: ${l.ibaratnya}. In the real world: ${l.kenyataannya}`
-      : `${stepLabel} ${stepIdx + 1}, ${l.judul}. Ibarat cerita: ${l.ibaratnya}. Dan dalam kenyataan teknologinya: ${l.kenyataannya}`;
-
-    // 3. Initialize utterance
-    const utterance = new SpeechSynthesisUtterance(textToSpeak);
-
-    // 4. Select optimized highly-natural premium/neural voice
-    const voices = window.speechSynthesis.getVoices();
-    const matchingVoices = voices.filter(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
-
-    let voice = null;
-    if (matchingVoices.length > 0) {
-      // Priority 1: Microsoft Natural Online voices (incredibly realistic Edge voices)
-      const microsoftOnline = matchingVoices.find(v =>
-        v.name.toLowerCase().includes("microsoft") &&
-        (v.name.toLowerCase().includes("natural") || v.name.toLowerCase().includes("online"))
-      );
-
-      // Priority 2: Google Chrome natural voices
-      const googleVoice = matchingVoices.find(v =>
-        v.name.toLowerCase().includes("google")
-      );
-
-      // Priority 3: Apple Safari Siri/Natural voices
-      const naturalVoice = matchingVoices.find(v =>
-        v.name.toLowerCase().includes("natural")
-      );
-
-      // Priority 4: Local offline premium services
-      const localVoice = matchingVoices.find(v => v.localService);
-
-      voice = microsoftOnline || googleVoice || naturalVoice || localVoice || matchingVoices[0];
-    }
-
-    if (voice) {
-      utterance.voice = voice;
-    }
-
-    // Slight speech speed optimization for warm, natural cadence
-    utterance.rate = lang === "id" ? 0.94 : 0.96;
-    utterance.pitch = 1.0;
-
-    // 5. Event bindings
-    utterance.onstart = () => {
-      setIsPlaying(true);
-      setIsPaused(false);
-    };
-
-    utterance.onend = () => {
-      setIsPlaying(false);
-      setIsPaused(false);
-
-      // Auto advance functionality
-      if (autoAdvance && stepIdx < data.langkah.length - 1) {
-        setTimeout(() => {
-          setCurrentStepIdx(prev => {
-            const nextIdx = prev + 1;
-            speakStep(nextIdx);
-            return nextIdx;
-          });
-        }, 1500); // 1.5s peaceful buffer between steps
-      }
-    };
-
-    utterance.onerror = () => {
-      setIsPlaying(false);
-      setIsPaused(false);
-    };
-
-    // 6. Speak!
-    window.speechSynthesis.speak(utterance);
-    setCurrentUtterance(utterance);
-  };
-
-  const pauseSpeech = () => {
-    window.speechSynthesis.pause();
-    setIsPaused(true);
-  };
-
-  const resumeSpeech = () => {
-    window.speechSynthesis.resume();
-    setIsPaused(false);
-  };
-
-  const stopSpeech = () => {
-    window.speechSynthesis.cancel();
-    setIsPlaying(false);
-    setIsPaused(false);
-  };
-
-  // Stop speech if page is unloaded or details change
-  useEffect(() => {
-    return () => {
-      window.speechSynthesis.cancel();
-    };
-  }, []);
-
-  // Stop speech if they trigger a new search or go back
-  useEffect(() => {
-    window.speechSynthesis.cancel();
-    setIsPlaying(false);
-    setIsPaused(false);
-  }, [data, isLoading]);
+  const {
+    isPlaying,
+    isPaused,
+    autoAdvance,
+    setAutoAdvance,
+    speakStep,
+    pauseSpeech,
+    resumeSpeech,
+    stopSpeech,
+  } = useAudioNarrator(data, lang, isLoading, setCurrentStepIdx);
 
   const t = TRANSLATIONS[lang];
 
@@ -631,14 +306,6 @@ export default function App() {
       default: return "";
     }
   };
-  const [history, setHistory] = useState<HistoryItem[]>(() => {
-    try {
-      const saved = localStorage.getItem("sederhanain_history");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -661,40 +328,6 @@ export default function App() {
     return () => window.removeEventListener("click", handleClose);
   }, [isProfileOpen]);
 
-  const fetchUserProfile = async (accessToken: string) => {
-    try {
-      const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-        headers: {
-          Authorization: `Bearer ${accessToken}`
-        }
-      });
-      const profile = await res.json();
-      if (profile.sub) {
-        setUserProfile(profile);
-        // Load history for this specific Google user
-        const saved = localStorage.getItem(`sederhanain_history_${profile.sub}`);
-        setHistory(saved ? JSON.parse(saved) : []);
-        return profile;
-      }
-    } catch (err) {
-      console.error("Failed to fetch user profile", err);
-    }
-    return null;
-  };
-
-  const handleLogout = () => {
-    googleLogout();
-    setToken(null);
-    setUserProfile(null);
-    // Reset history to anonymous local storage
-    try {
-      const saved = localStorage.getItem("sederhanain_history");
-      setHistory(saved ? JSON.parse(saved) : []);
-    } catch {
-      setHistory([]);
-    }
-  };
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!data) return;
@@ -707,15 +340,6 @@ export default function App() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [data]);
-
-  const login = useGoogleLogin({
-    onSuccess: async (tokenResponse) => {
-      setToken(tokenResponse.access_token);
-      const profile = await fetchUserProfile(tokenResponse.access_token);
-      executeAnalysis(conceptInput, tokenResponse.access_token, profile?.sub);
-    },
-    onError: () => alert('Google Login Failed'),
-  });
 
   const executeAnalysis = async (concept: string, currentToken?: string, activeProfileSub?: string) => {
     if (!concept.trim()) return;
@@ -743,19 +367,8 @@ export default function App() {
       if (json.error) throw new Error(json.error);
       setData(json);
 
-      // Save successful result to local storage history (namespaced by Google user profile if logged in)
-      setHistory(prev => {
-        const filtered = prev.filter(item => item.concept.toLowerCase() !== concept.toLowerCase());
-        const updated = [{ concept, data: json, timestamp: Date.now() }, ...filtered].slice(0, 5);
-        try {
-          const sub = activeProfileSub || userProfile?.sub;
-          const key = sub ? `sederhanain_history_${sub}` : "sederhanain_history";
-          localStorage.setItem(key, JSON.stringify(updated));
-        } catch (e) {
-          console.error(e);
-        }
-        return updated;
-      });
+      // Save successful result to local storage history
+      saveToHistory(concept, json);
     } catch (err: any) {
       alert("Error: " + err.message);
     } finally {
@@ -782,19 +395,6 @@ export default function App() {
     item.data.tema.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const deleteHistoryItem = (conceptToDelete: string) => {
-    setHistory(prev => {
-      const updated = prev.filter(item => item.concept.toLowerCase() !== conceptToDelete.toLowerCase());
-      try {
-        const sub = userProfile?.sub;
-        const key = sub ? `sederhanain_history_${sub}` : "sederhanain_history";
-        localStorage.setItem(key, JSON.stringify(updated));
-      } catch (e) {
-        console.error(e);
-      }
-      return updated;
-    });
-  };
 
   const renderLanguageSwitcher = () => (
     <div className="flex items-center gap-1 bg-white/5 p-1 rounded-full border border-white/10 shrink-0 select-none">
@@ -1901,23 +1501,9 @@ export default function App() {
                 type="button"
                 onClick={async () => {
                   if (!shareCardRef.current) return;
+                  const filename = `sederhanain-${conceptInput.toLowerCase().replace(/\s+/g, '-')}.png`;
                   try {
-                    const canvas = await html2canvas(shareCardRef.current, {
-                      backgroundColor: '#070908',
-                      scale: 2,
-                      useCORS: true,
-                    });
-                    canvas.toBlob((blob) => {
-                      if (!blob) return;
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `sederhanain-${conceptInput.toLowerCase().replace(/\s+/g, '-')}.png`;
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                      URL.revokeObjectURL(url);
-                    }, 'image/png');
+                    await captureAndDownload(shareCardRef.current, filename);
                   } catch (err) {
                     console.error('Failed to capture card:', err);
                   }
