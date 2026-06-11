@@ -5,11 +5,9 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Loader2, ChevronRight, ChevronLeft, LogOut, Command, Search, X, AlertOctagon, Sparkles, Lock, History, ArrowRight, Volume2, Play, Pause, Square, Trash2, Share2, Download, Copy, Check } from "lucide-react";
-import { useGoogleLogin, googleLogout } from '@react-oauth/google';
-import { Komponen, Langkah, SederhanainData, HistoryItem } from "./types";
+import { ChevronRight, ChevronLeft, Lock, History, Volume2, Play, Pause, Square, Share2 } from "lucide-react";
+import { SederhanainData } from "./types";
 import { STEPS, TRANSLATIONS } from "./constants/translations";
-import { captureAndDownload } from "./utils/capture";
 import { useAudioNarrator } from "./hooks/useAudioNarrator";
 import { useGoogleAuth } from "./hooks/useGoogleAuth";
 import { InteractiveLoader } from "./components/visualizer/InteractiveLoader";
